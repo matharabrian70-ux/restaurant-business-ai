@@ -37,3 +37,26 @@ test("Resend webhook verification rejects invalid signatures", () => {
     /Invalid webhook signature/
   );
 });
+
+import { discoverFromGooglePlaces } from "../src/autonomy/google-places-discovery.js";
+
+test("Google Places discovery preserves safe API error details", async () => {
+  const fetchImpl = async () => new Response(
+    JSON.stringify({
+      error: {
+        status: "PERMISSION_DENIED",
+        message: "Requests from this API key are blocked."
+      }
+    }),
+    { status: 403, headers: { "content-type": "application/json" } }
+  );
+
+  await assert.rejects(
+    () => discoverFromGooglePlaces({
+      apiKey: "test-key",
+      fetchImpl,
+      queries: ["restaurants in Nairobi, Kenya"]
+    }),
+    /HTTP 403.*PERMISSION_DENIED.*Requests from this API key are blocked/
+  );
+});
