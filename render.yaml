@@ -12,10 +12,16 @@ services:
         value: "false"
       - key: SALES_PROVIDER_NAME
         value: resend
+      - key: SALES_EMAIL_ENV
+        value: production
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM
-        value: onboarding@resend.dev
+        sync: false
+      - key: RESEND_SENDING_DOMAIN
+        sync: false
+      - key: RESEND_DOMAIN_VERIFIED
+        value: "false"
       - key: SALES_TEST_MODE
         value: "false"
       - key: SALES_TEST_RECIPIENT
