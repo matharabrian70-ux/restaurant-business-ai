@@ -11,7 +11,7 @@ export const DISCOVERY_SOURCES = Object.freeze({
 
 const ALLOWED_FIELDS = new Set([
   "id","name","businessType","location","address","phone","email",
-  "website","source","sourceUrl","sourceRef","discoveredAt","signals","notes"
+  "website","source","sourceUrl","sourceRef","discoveredAt","signals","notes","consentState"
 ]);
 
 function cleanString(value) {
@@ -37,6 +37,7 @@ export function normalizeDiscoveryRecord(record) {
   normalized.discoveredAt = cleanString(normalized.discoveredAt) ?? new Date().toISOString();
   normalized.notes = Array.isArray(normalized.notes) ? normalized.notes : [];
   normalized.signals = normalized.signals && typeof normalized.signals === "object" ? { ...normalized.signals } : {};
+  normalized.consentState = cleanString(normalized.consentState) ?? "unknown";
 
   if (!normalized.name) throw new Error("Restaurant name is required");
   if (!normalized.location) throw new Error("Restaurant location is required");
