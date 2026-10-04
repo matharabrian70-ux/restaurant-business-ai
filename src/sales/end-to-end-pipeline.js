@@ -195,6 +195,8 @@ export class EndToEndSalesPipeline {
           }
         }
       );
+    }
+
     return {
       lead: nextLead,
       decision: result.decision
