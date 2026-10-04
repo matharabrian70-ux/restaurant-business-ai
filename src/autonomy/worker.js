@@ -148,6 +148,20 @@ export class AutonomousWorker {
     return { status: pilot.status, discovered: records.length, sent, skipped };
   }
 
+  async fetchInboundContent(emailId) {
+    if (!this.env.RESEND_API_KEY || !emailId) return {};
+    const response = await this.fetchImpl(
+      `https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`,
+      {
+        headers: {
+          authorization: "Bearer " + this.env.RESEND_API_KEY
+        }
+      }
+    );
+    if (!response.ok) return {};
+    return response.json().catch(() => ({}));
+  }
+
   async handleInbound(event) {
     if (event?.type !== "email.received") return { ignored: true };
 
@@ -161,9 +175,10 @@ export class AutonomousWorker {
     const lead = await this.store.findLeadByEmail(sender);
     if (!lead) return { matched: false, handoff: false };
 
+    const received = await this.fetchInboundContent(event.data?.email_id);
     const reply = {
-      subject: event.data?.subject ?? "",
-      body: event.data?.text ?? event.data?.html ?? ""
+      subject: event.data?.subject ?? received.subject ?? "",
+      body: received.text ?? event.data?.text ?? received.html ?? event.data?.html ?? ""
     };
 
     const classification = classifyReply(reply);
