@@ -19,6 +19,10 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function todayKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
 function requireHuman(actor) {
   if (actor !== "human") throw new Error("Pilot control requires a human actor");
 }
@@ -48,6 +52,8 @@ export function createPilot({
     stageSize,
     dailyLimit,
     sentCount: 0,
+    sentToday: 0,
+    dayKey: todayKey(),
     successfulSends: 0,
     failedSends: 0,
     bouncedCount: 0,
@@ -61,14 +67,20 @@ export function createPilot({
   };
 }
 
-export function authorizePilotSend(pilot, {
-  recipient,
-  dailySent = 0
-} = {}) {
+function resetDailyCounter(pilot) {
+  const key = todayKey();
+  if (pilot.dayKey !== key) {
+    pilot.dayKey = key;
+    pilot.sentToday = 0;
+  }
+}
+
+export function authorizePilotSend(pilot, { recipient } = {}) {
   if (!pilot) throw new Error("Pilot configuration is required");
+  resetDailyCounter(pilot);
   if (pilot.status !== PILOT_STATUS.ACTIVE) throw new Error("Controlled sales pilot is not active");
   if (pilot.sentCount >= pilot.stageSize) throw new Error("Pilot stage recipient cap reached");
-  if (dailySent >= pilot.dailyLimit) throw new Error("Pilot daily send limit reached");
+  if (pilot.sentToday >= pilot.dailyLimit) throw new Error("Pilot daily send limit reached");
 
   const normalized = String(recipient ?? "").trim().toLowerCase();
   if (!normalized) throw new Error("Pilot recipient is required");
@@ -76,7 +88,11 @@ export function authorizePilotSend(pilot, {
     throw new Error("Recipient has already been attempted in this pilot");
   }
 
-  return { authorized: true, remainingStageCapacity: pilot.stageSize - pilot.sentCount };
+  return {
+    authorized: true,
+    remainingStageCapacity: pilot.stageSize - pilot.sentCount,
+    remainingDailyCapacity: pilot.dailyLimit - pilot.sentToday
+  };
 }
 
 export function recordPilotSend(pilot, {
@@ -86,6 +102,9 @@ export function recordPilotSend(pilot, {
   complaint = false,
   suppressed = false
 } = {}) {
+  if (!pilot) throw new Error("Pilot configuration is required");
+  resetDailyCounter(pilot);
+
   const normalized = String(recipient ?? "").trim().toLowerCase();
   if (!normalized) throw new Error("Pilot recipient is required");
   if (pilot.uniqueRecipients.includes(normalized)) {
@@ -94,6 +113,7 @@ export function recordPilotSend(pilot, {
 
   pilot.uniqueRecipients.push(normalized);
   pilot.sentCount += 1;
+  pilot.sentToday += 1;
 
   if (success) pilot.successfulSends += 1;
   else pilot.failedSends += 1;
@@ -113,18 +133,10 @@ export function evaluatePilot(pilot) {
   const suppressionRate = attempts ? pilot.suppressedCount / attempts : 0;
   const stopReasons = [];
 
-  if (bounceRate > pilot.limits.maxBounceRate) {
-    stopReasons.push("bounce_rate_exceeded");
-  }
-  if (pilot.complaintCount >= pilot.limits.maxComplaintCount) {
-    stopReasons.push("complaint_threshold_reached");
-  }
-  if (suppressionRate > pilot.limits.maxSuppressionRate) {
-    stopReasons.push("suppression_rate_exceeded");
-  }
-  if (pilot.failedSends >= pilot.limits.maxProviderFailures) {
-    stopReasons.push("provider_failure_threshold_reached");
-  }
+  if (bounceRate > pilot.limits.maxBounceRate) stopReasons.push("bounce_rate_exceeded");
+  if (pilot.complaintCount >= pilot.limits.maxComplaintCount) stopReasons.push("complaint_threshold_reached");
+  if (suppressionRate > pilot.limits.maxSuppressionRate) stopReasons.push("suppression_rate_exceeded");
+  if (pilot.failedSends >= pilot.limits.maxProviderFailures) stopReasons.push("provider_failure_threshold_reached");
 
   return {
     safeToContinue: stopReasons.length === 0,
@@ -177,9 +189,7 @@ export function advancePilotStage(pilot, { actor = "human" } = {}) {
   }
 
   const evaluation = evaluatePilot(pilot);
-  if (!evaluation.safeToContinue) {
-    throw new Error("Pilot cannot advance while a stop condition is active");
-  }
+  if (!evaluation.safeToContinue) throw new Error("Pilot cannot advance while a stop condition is active");
   if (pilot.sentCount < pilot.stageSize) {
     throw new Error("Current pilot stage must reach its recipient cap before evaluation");
   }
@@ -203,6 +213,8 @@ export function advancePilotStage(pilot, { actor = "human" } = {}) {
     status: PILOT_STATUS.ACTIVE,
     stageSize: nextStage,
     sentCount: 0,
+    sentToday: 0,
+    dayKey: todayKey(),
     successfulSends: 0,
     failedSends: 0,
     bouncedCount: 0,
@@ -218,6 +230,7 @@ export function advancePilotStage(pilot, { actor = "human" } = {}) {
 }
 
 export function getPilotSummary(pilot) {
+  resetDailyCounter(pilot);
   const evaluation = evaluatePilot(pilot);
   return {
     id: pilot.id,
@@ -225,7 +238,9 @@ export function getPilotSummary(pilot) {
     stageSize: pilot.stageSize,
     dailyLimit: pilot.dailyLimit,
     sentCount: pilot.sentCount,
+    sentToday: pilot.sentToday,
     remaining: Math.max(0, pilot.stageSize - pilot.sentCount),
+    dailyRemaining: Math.max(0, pilot.dailyLimit - pilot.sentToday),
     ...evaluation
   };
 }
