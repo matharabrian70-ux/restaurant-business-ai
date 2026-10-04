@@ -68,7 +68,7 @@ test("autonomous authorization creates a policy approval", async () => {
     }
   ]);
 
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 1, JSON.stringify(result));
   assert.equal(result.failed, 0);
   const approvals = controlPlane.listApprovals();
   assert.equal(approvals.length, 1);
@@ -111,7 +111,7 @@ test("autonomous runner respects pilot daily limit", async () => {
     }
   ]);
 
-  assert.equal(result.sent, 1);
+  assert.equal(result.sent, 1, JSON.stringify(result));
   assert.equal(result.failed, 1);
   assert.match(result.items[1].reason, /daily send limit|Pilot/);
 });
