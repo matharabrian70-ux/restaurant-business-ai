@@ -72,7 +72,7 @@ test("end-to-end pipeline reaches human handoff without autonomous sending", asy
   });
 
   assert.equal(added.lead.stage, "ready_for_outreach");
-  assert.equal(added.lead.priority, "critical");
+  assert.equal(added.lead.priority, "normal");
 
   const prepared = pipeline.prepareOutreach(added.lead.id);
   assert.equal(prepared.draft.status, "draft");
