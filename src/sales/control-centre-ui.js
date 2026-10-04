@@ -1,150 +1,559 @@
-import { AUDIT_ACTORS } from "./audit.js";
-
-function json(res, status, body) {
-  res.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store"
-  });
-  res.end(JSON.stringify(body));
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-async function readJson(req) {
-  const chunks = [];
+export function renderControlCentre() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sales Control Centre</title>
 
-  for await (const chunk of req) {
-    chunks.push(chunk);
-  }
-
-  if (chunks.length === 0) return {};
-
-  const raw = Buffer.concat(chunks).toString("utf8");
-
-  if (!raw.trim()) return {};
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error("Invalid JSON body");
-  }
-}
-
-function tokensMatch(expected, supplied, timingSafeEqual) {
-  if (!expected || !supplied) return false;
-
-  const a = Buffer.from(expected);
-  const b = Buffer.from(supplied);
-
-  if (a.length !== b.length) return false;
-
-  return timingSafeEqual(a, b);
-}
-
-export function createControlCentreApi({
-  controlPlane,
-  controlToken,
-  timingSafeEqual
-}) {
-  if (!controlPlane) {
-    throw new Error("Control plane is required");
-  }
-
-  return async function handleControlRequest(req, res) {
-    if (!req.url?.startsWith("/control")) {
-      return false;
+  <style>
+    * {
+      box-sizing: border-box;
     }
 
-    const authorization = req.headers.authorization || "";
-    const suppliedToken = authorization.startsWith("Bearer ")
-      ? authorization.slice(7)
-      : "";
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      background: #f5f7f9;
+      color: #17202a;
+    }
 
-    if (!tokensMatch(controlToken, suppliedToken, timingSafeEqual)) {
-      json(res, 401, { error: "unauthorized" });
-      return true;
+    header {
+      background: #111827;
+      color: white;
+      padding: 20px 24px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    header p {
+      margin: 5px 0 0;
+      opacity: .7;
+      font-size: 13px;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 18px;
+    }
+
+    .auth,
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+      margin-bottom: 18px;
+    }
+
+    .auth {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    input,
+    textarea,
+    button {
+      font: inherit;
+    }
+
+    input {
+      flex: 1;
+      min-width: 240px;
+      padding: 11px 13px;
+      border: 1px solid #d6dbe1;
+      border-radius: 9px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 9px;
+      padding: 11px 16px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .primary {
+      background: #16a34a;
+      color: white;
+    }
+
+    .danger {
+      background: #dc2626;
+      color: white;
+    }
+
+    .muted {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      background: white;
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 28px;
+      margin-top: 6px;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .lead,
+    .approval {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .lead {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .lead-name {
+      font-weight: 700;
+    }
+
+    .meta {
+      color: #667085;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .approval-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #message {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 800px) {
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .lead {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Sales Control Centre</h1>
+    <p>Human oversight for the Restaurant Business AI sales pipeline</p>
+  </header>
+
+  <main>
+    <section class="auth">
+      <input
+        id="token"
+        type="password"
+        placeholder="Control Centre token"
+        autocomplete="off"
+      >
+
+      <button class="primary" onclick="connect()">
+        Connect
+      </button>
+
+      <button class="muted" onclick="disconnect()">
+        Disconnect
+      </button>
+
+      <div id="message"></div>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        Leads
+        <strong id="leadCount">0</strong>
+      </div>
+
+      <div class="stat">
+        Pending approvals
+        <strong id="pendingCount">0</strong>
+      </div>
+
+      <div class="stat">
+        High priority
+        <strong id="highCount">0</strong>
+      </div>
+
+      <div class="stat">
+        Human handoffs
+        <strong id="handoffCount">0</strong>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>Lead Queue</h2>
+        <button class="muted" onclick="loadAll()">Refresh</button>
+      </div>
+
+      <div id="queue">
+        Connect to load the queue.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>Outreach Approvals</h2>
+      </div>
+
+      <div id="approvals">
+        Connect to load approvals.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>Lead Details</h2>
+      </div>
+
+      <div id="details">
+        Select a lead to inspect it.
+      </div>
+    </section>
+  </main>
+
+<script>
+  const TOKEN_KEY = "sales_control_centre_token";
+
+  function getToken() {
+    return sessionStorage.getItem(TOKEN_KEY) || "";
+  }
+
+  function setMessage(message) {
+    document.getElementById("message").textContent = message;
+  }
+
+  function connect() {
+    const token = document.getElementById("token").value.trim();
+
+    if (!token) {
+      setMessage("Enter the Control Centre token.");
+      return;
+    }
+
+    sessionStorage.setItem(TOKEN_KEY, token);
+    document.getElementById("token").value = "";
+
+    setMessage("Connected.");
+    loadAll();
+  }
+
+  function disconnect() {
+    sessionStorage.removeItem(TOKEN_KEY);
+    document.getElementById("queue").textContent =
+      "Disconnected.";
+    document.getElementById("approvals").textContent =
+      "Disconnected.";
+    document.getElementById("details").textContent =
+      "Select a lead to inspect it.";
+    setMessage("Disconnected.");
+  }
+
+  async function api(path, options = {}) {
+    const token = getToken();
+
+    const headers = {
+      ...(options.headers || {}),
+      "Authorization": "Bearer " + token
+    };
+
+    if (options.body) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(path, {
+      ...options,
+      headers
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Request failed");
+    }
+
+    return data;
+  }
+
+  async function loadAll() {
+    if (!getToken()) {
+      setMessage("Not connected.");
+      return;
     }
 
     try {
-      if (req.method === "GET" && req.url === "/control/queue") {
-        json(res, 200, {
-          leads: controlPlane.listQueue()
-        });
-        return true;
-      }
+      const [queueData, approvalData] = await Promise.all([
+        api("/control/queue"),
+        api("/control/approvals")
+      ]);
 
-      if (req.method === "GET" && req.url === "/control/approvals") {
-        json(res, 200, {
-          approvals: controlPlane.listApprovals()
-        });
-        return true;
-      }
+      renderQueue(queueData.leads);
+      renderApprovals(approvalData.approvals);
+      updateStats(queueData.leads, approvalData.approvals);
 
-      if (
-        req.method === "GET" &&
-        req.url.startsWith("/control/leads/")
-      ) {
-        const leadId = decodeURIComponent(
-          req.url.slice("/control/leads/".length)
-        );
-
-        const lead = controlPlane.getLead(leadId);
-
-        if (!lead) {
-          json(res, 404, { error: "lead_not_found" });
-          return true;
-        }
-
-        json(res, 200, {
-          lead,
-          audit: controlPlane.getAuditLog(leadId)
-        });
-
-        return true;
-      }
-
-      if (
-        req.method === "POST" &&
-        req.url.startsWith("/control/approvals/") &&
-        req.url.endsWith("/decide")
-      ) {
-        const prefix = "/control/approvals/";
-        const suffix = "/decide";
-
-        const draftId = decodeURIComponent(
-          req.url.slice(prefix.length, -suffix.length)
-        );
-
-        const body = await readJson(req);
-
-        if (typeof body.approved !== "boolean") {
-          json(res, 400, {
-            error: "approved must be a boolean"
-          });
-          return true;
-        }
-
-        const approval = controlPlane.decideOutreachApproval(
-          draftId,
-          body.approved,
-          {
-            actor: AUDIT_ACTORS.HUMAN,
-            reason: typeof body.reason === "string"
-              ? body.reason.slice(0, 1000)
-              : ""
-          }
-        );
-
-        json(res, 200, { approval });
-        return true;
-      }
-
-      json(res, 404, { error: "control_route_not_found" });
-      return true;
+      setMessage("Control Centre synchronized.");
     } catch (error) {
-      json(res, 400, {
-        error: error.message
-      });
-
-      return true;
+      setMessage(error.message);
     }
-  };
+  }
+
+  function updateStats(leads, approvals) {
+    document.getElementById("leadCount").textContent =
+      leads.length;
+
+    document.getElementById("pendingCount").textContent =
+      approvals.filter(a => a.status === "pending").length;
+
+    document.getElementById("highCount").textContent =
+      leads.filter(
+        lead => lead.priority === "high" ||
+                lead.priority === "critical"
+      ).length;
+
+    document.getElementById("handoffCount").textContent =
+      leads.filter(
+        lead => lead.stage === "human_handoff"
+      ).length;
+  }
+
+  function renderQueue(leads) {
+    const container = document.getElementById("queue");
+
+    if (!leads.length) {
+      container.textContent = "No leads in the queue.";
+      return;
+    }
+
+    container.innerHTML = leads.map(lead => \`
+      <div class="lead">
+        <div>
+          <div class="lead-name">
+            \${escapeHtml(lead.name)}
+          </div>
+
+          <div class="meta">
+            Stage: \${escapeHtml(lead.stage)}
+            · Priority: \${escapeHtml(lead.priority)}
+          </div>
+
+          <div class="meta">
+            Next action: \${escapeHtml(lead.nextAction)}
+          </div>
+        </div>
+
+        <div class="actions">
+          <button
+            class="muted"
+            onclick="loadLead('\${encodeURIComponent(lead.id)}')">
+            View
+          </button>
+        </div>
+      </div>
+    \`).join("");
+  }
+
+  function renderApprovals(approvals) {
+    const container = document.getElementById("approvals");
+
+    if (!approvals.length) {
+      container.textContent = "No outreach approvals.";
+      return;
+    }
+
+    container.innerHTML = approvals.map(approval => {
+      const pending = approval.status === "pending";
+
+      return \`
+        <div class="approval">
+          <strong>
+            Draft: \${escapeHtml(approval.draftId)}
+          </strong>
+
+          <div class="meta">
+            Lead: \${escapeHtml(approval.leadId)}
+          </div>
+
+          <div class="meta">
+            Status: \${escapeHtml(approval.status)}
+          </div>
+
+          \${pending ? \`
+            <div class="approval-actions">
+              <button
+                class="primary"
+                onclick="decideApproval(
+                  '\${encodeURIComponent(approval.draftId)}',
+                  true
+                )">
+                Approve
+              </button>
+
+              <button
+                class="danger"
+                onclick="decideApproval(
+                  '\${encodeURIComponent(approval.draftId)}',
+                  false
+                )">
+                Reject
+              </button>
+            </div>
+          \` : ""}
+        </div>
+      \`;
+    }).join("");
+  }
+
+  async function decideApproval(encodedDraftId, approved) {
+    const draftId = decodeURIComponent(encodedDraftId);
+
+    try {
+      const reason = approved
+        ? "Approved by human operator"
+        : "Rejected by human operator";
+
+      await api(
+        "/control/approvals/" +
+        encodeURIComponent(draftId) +
+        "/decide",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            approved,
+            reason
+          })
+        }
+      );
+
+      await loadAll();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function loadLead(encodedLeadId) {
+    const leadId = decodeURIComponent(encodedLeadId);
+
+    try {
+      const data = await api(
+        "/control/leads/" +
+        encodeURIComponent(leadId)
+      );
+
+      document.getElementById("details").innerHTML = \`
+        <div class="lead">
+          <div>
+            <div class="lead-name">
+              \${escapeHtml(data.lead.name)}
+            </div>
+
+            <div class="meta">
+              ID: \${escapeHtml(data.lead.id)}
+            </div>
+
+            <div class="meta">
+              Stage: \${escapeHtml(data.lead.stage)}
+            </div>
+
+            <div class="meta">
+              Source: \${escapeHtml(data.lead.source)}
+            </div>
+
+            <div class="meta">
+              Website: \${escapeHtml(data.lead.website || "None")}
+            </div>
+
+            <div class="meta">
+              Next action: \${escapeHtml(data.lead.nextAction)}
+            </div>
+          </div>
+        </div>
+
+        <h3>Audit history</h3>
+
+        \${data.audit.length
+          ? data.audit.map(event => \`
+            <div class="approval">
+              <strong>
+                \${escapeHtml(event.action)}
+              </strong>
+
+              <div class="meta">
+                Actor: \${escapeHtml(event.actor)}
+              </div>
+
+              <div class="meta">
+                Time: \${escapeHtml(event.timestamp)}
+              </div>
+            </div>
+          \`).join("")
+          : "<p>No audit events.</p>"
+        }
+      \`;
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+</script>
+</body>
+</html>`;
 }
