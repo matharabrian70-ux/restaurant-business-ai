@@ -123,10 +123,6 @@ export class AutonomousWorker {
         consent: enriched.consentState
       });
 
-      const identity = record.website
-        ? "website:" + record.website.toLowerCase().replace(/^https?:///, "").replace(//$/, "")
-        : "email:" + record.email.toLowerCase();
-
       await this.store.upsertLead({
         identity,
         leadId: added.lead.id,
