@@ -338,9 +338,9 @@ export function renderControlCentre() {
         api("/control/approvals")
       ]);
 
-      renderQueue(queueData.leads);
+      renderQueue(queueData.queue);
       renderApprovals(approvalData.approvals);
-      updateStats(queueData.leads, approvalData.approvals);
+      updateStats(queueData.queue, approvalData.approvals);
 
       setMessage("Control Centre synchronized.");
     } catch (error) {
