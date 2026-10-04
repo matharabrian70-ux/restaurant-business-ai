@@ -171,6 +171,13 @@ export class EndToEndSalesPipeline {
 
     const result = processResponse(lead, response, buyingSignals);
 
+    if (result.decision.classification !== "positive") {
+      return {
+        lead,
+        decision: result.decision
+      };
+    }
+
     let nextLead = this.controlPlane.transitionLead(
       leadId,
       { type: "positive_response" },
@@ -188,14 +195,6 @@ export class EndToEndSalesPipeline {
           }
         }
       );
-    } else if (result.decision.action === "close_lost") {
-      nextLead = this.controlPlane.transitionLead(
-        leadId,
-        { type: "qualified", reason: "Response classified as negative." },
-        { actor: "agent" }
-      );
-    }
-
     return {
       lead: nextLead,
       decision: result.decision
