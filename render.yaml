@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: restaurant-business-ai-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: SALES_PROVIDER_ENABLED
+        value: "false"
+      - key: SALES_PROVIDER_NAME
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        value: onboarding@resend.dev
