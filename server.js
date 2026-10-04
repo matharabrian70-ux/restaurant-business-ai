@@ -10,6 +10,8 @@ import { renderControlCentre } from "./src/sales/control-centre-ui.js";
 import { AutonomousWorker } from "./src/autonomy/worker.js";
 import { createHandoffNotifier } from "./src/autonomy/notify.js";
 import { verifyResendWebhook } from "./src/autonomy/resend-webhook.js";
+import { runDiscoveryOnlyTest } from "./src/autonomy/discovery-test.js";
+import { PostgresAutonomyStore } from "./src/autonomy/postgres-store.js";
 
 const port = Number(process.env.PORT || 10000);
 
@@ -99,6 +101,33 @@ export function buildServer(
       );
 
       if (handled) return;
+    }
+
+    if (req.method === "POST" && pathname === "/autonomy/discovery-test") {
+      if (!autonomyTokenMatches(env, req)) {
+        res.writeHead(401, {"content-type":"application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      const store = new PostgresAutonomyStore({
+        connectionString: env.DATABASE_URL
+      });
+
+      try {
+        const result = await runDiscoveryOnlyTest({
+          env,
+          store
+        });
+        await store.close();
+        res.writeHead(200, {"content-type":"application/json"});
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        await store.close().catch(() => {});
+        res.writeHead(503, {"content-type":"application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
     }
 
     if (req.method === "POST" && pathname === "/autonomy/run") {
