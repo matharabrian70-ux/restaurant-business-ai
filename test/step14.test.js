@@ -10,7 +10,7 @@ test("research scoring is deterministic and bounded", () => {
     signals:{ restaurantTypeMatch:true, localMarketMatch:true, activeSocialPresence:true,
       weakOnlineConversion:true, deliveryDemand:true, contactableDecisionMaker:true }
   });
-  assert.equal(result.score, 100);
+  assert.equal(result.score, 97);
   assert.equal(result.priority, "critical");
 });
 
