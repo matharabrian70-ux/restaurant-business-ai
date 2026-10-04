@@ -22,3 +22,5 @@ services:
         sync: false
       - key: SALES_TEST_TOKEN
         sync: false
+      - key: CONTROL_PLANE_TOKEN
+        sync: false
