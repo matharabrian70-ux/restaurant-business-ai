@@ -130,7 +130,8 @@ export class AutonomousSalesRunner {
           results.items.push({
             leadId: record.id ?? null,
             outcome: "failed",
-            reason: error.message
+            reason: error.message,
+            stack: error.stack
           });
 
           if (this.pilot.status === PILOT_STATUS.PAUSED) break;
