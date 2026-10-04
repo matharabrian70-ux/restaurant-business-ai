@@ -169,14 +169,19 @@ export class SalesControlPlane {
     return approval ? clone(approval) : null;
   }
 
-  listApprovals() {
+  listApprovals({ leadId } = {}) {
   return [...this.approvals.values()]
+    .filter(
+      approval =>
+        !leadId ||
+        approval.leadId === leadId
+    )
     .sort((a, b) => {
       return new Date(a.requestedAt).getTime() -
         new Date(b.requestedAt).getTime();
     })
     .map(clone);
-} 
+}
   isOutreachApproved(leadId, draftId) {
     const approval = this.approvals.get(draftId);
     return Boolean(approval && approval.leadId === leadId && approval.status === "approved");
