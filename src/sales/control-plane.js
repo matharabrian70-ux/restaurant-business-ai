@@ -169,15 +169,24 @@ export class SalesControlPlane {
     return approval ? clone(approval) : null;
   }
 
+  listApprovals() {
+  return [...this.approvals.values()]
+    .sort((a, b) => {
+      return new Date(a.requestedAt).getTime() -
+        new Date(b.requestedAt).getTime();
+    })
+    .map(clone);
+} 
   isOutreachApproved(leadId, draftId) {
     const approval = this.approvals.get(draftId);
     return Boolean(approval && approval.leadId === leadId && approval.status === "approved");
   }
-
+  
   getAuditLog(leadId) {
     return auditForLead(this.auditLog, leadId);
   }
 
+  
   nextStageForEvent(type) {
     switch (type) {
       case "researched": return LEAD_STAGES.READY_FOR_OUTREACH;
