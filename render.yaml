@@ -16,3 +16,9 @@ services:
         sync: false
       - key: RESEND_FROM
         value: onboarding@resend.dev
+      - key: SALES_TEST_MODE
+        value: "false"
+      - key: SALES_TEST_RECIPIENT
+        sync: false
+      - key: SALES_TEST_TOKEN
+        sync: false
