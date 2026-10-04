@@ -1,0 +1,8 @@
+{
+  "name": "restaurant-business-ai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI Business OS around the Restaurant DOS",
+  "type": "module",
+  "scripts": { "test": "node --test" }
+}
