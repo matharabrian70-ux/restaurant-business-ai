@@ -74,7 +74,12 @@ export class AutonomousWorker {
         continue;
       }
 
-      const existing = await this.store.getLead(record.id ? `website:${(record.website ?? record.id).toLowerCase()}` : record.name);
+      const identity = record.website
+        ? "website:" + record.website.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "")
+        : record.email
+          ? "email:" + record.email.toLowerCase()
+          : "place:" + String(record.id);
+      const existing = await this.store.getLead(identity);
       if (existing?.last_outreach_at || existing?.handoff_at) {
         skipped++;
         continue;
