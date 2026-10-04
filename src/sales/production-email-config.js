@@ -1,4 +1,4 @@
-const EMAIL_PATTERN = /^[^@\\s]+@([^@\\s]+)$/;
+const EMAIL_PATTERN = /^[^@\s]+@([^@\s]+)$/;
 
 function senderAddress(value = "") {
   const match = String(value).match(/<([^>]+)>/);
