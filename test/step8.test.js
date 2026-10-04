@@ -29,7 +29,7 @@ test("Resend transport sends through the provider API", async () => {
 });
 
 test("factory remains disabled unless explicitly enabled", () => {
-  assert.equal(createConfiguredTransport({}).constructor, undefined);
+  assert.equal(createConfiguredTransport({}), null);
   assert.equal(createConfiguredTransport({ SALES_PROVIDER_ENABLED: "false" }), null);
 });
 
