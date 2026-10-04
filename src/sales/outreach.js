@@ -13,6 +13,8 @@ export function createOutreachDraft({ lead, research, channel = "email" }) {
     "",
     "If you're open to it, I can share a short demo.",
     "",
+    "If you'd rather not receive messages from me, just reply with STOP.",
+    "",
     "Regards"
   ].join("\\n");
 
