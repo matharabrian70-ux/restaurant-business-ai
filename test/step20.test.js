@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { SalesControlPlane } from "../src/sales/control-plane.js";
 import { EndToEndSalesPipeline } from "../src/sales/end-to-end-pipeline.js";
-import { ComplianceStore } from "../src/sales/compliance-store.js";
+import { createSuppressionStore } from "../src/sales/compliance.js";
 import { AutonomousSalesRunner } from "../src/sales/autonomous-runner.js";
 import { createPilot } from "../src/sales/pilot.js";
 
@@ -25,7 +25,7 @@ test("autonomous runner is disabled by default", async () => {
   const pipeline = new EndToEndSalesPipeline({
     controlPlane: new SalesControlPlane(),
     transport: makeTransport(),
-    suppressionStore: new ComplianceStore()
+    suppressionStore: createSuppressionStore()
   });
 
   const runner = new AutonomousSalesRunner({
@@ -45,7 +45,7 @@ test("autonomous authorization creates a policy approval", async () => {
   const pipeline = new EndToEndSalesPipeline({
     controlPlane,
     transport: makeTransport(),
-    suppressionStore: new ComplianceStore()
+    suppressionStore: createSuppressionStore()
   });
 
   const runner = new AutonomousSalesRunner({
@@ -81,7 +81,7 @@ test("autonomous runner respects pilot daily limit", async () => {
   const pipeline = new EndToEndSalesPipeline({
     controlPlane,
     transport: makeTransport(),
-    suppressionStore: new ComplianceStore()
+    suppressionStore: createSuppressionStore()
   });
 
   const runner = new AutonomousSalesRunner({
