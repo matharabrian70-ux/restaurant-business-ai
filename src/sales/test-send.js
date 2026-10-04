@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 const TEST_SUBJECT = "Restaurant Business AI — Resend test";
 const TEST_BODY = [
   "This is a controlled communication test from Restaurant Business AI.",
@@ -16,12 +18,31 @@ export function validateControlledTestConfig(env = process.env) {
   return { ok: errors.length === 0, errors };
 }
 
+export function buildControlledTestIdempotencyKey(env = process.env) {
+  const payloadIdentity = JSON.stringify({
+    from: String(env.RESEND_FROM || ""),
+    to: String(env.SALES_TEST_RECIPIENT || ""),
+    subject: TEST_SUBJECT,
+    text: TEST_BODY,
+    leadId: "CONTROLLED-TEST",
+    outreachId: "restaurant-business-ai-resend-test"
+  });
+
+  const digest = createHash("sha256")
+    .update(payloadIdentity)
+    .digest("hex");
+
+  return "controlled-test/resend/" + digest;
+}
+
 export async function sendControlledTestEmail({ env = process.env, transport }) {
   const validation = validateControlledTestConfig(env);
   if (!validation.ok) throw new Error(validation.errors.join("; "));
   if (!transport?.send) throw new Error("Transport is required");
 
-  const testId = "restaurant-business-ai-resend-test-v1";
+  const testId = "restaurant-business-ai-resend-test";
+  const idempotencyKey = buildControlledTestIdempotencyKey(env);
+
   const result = await transport.send({
     id: testId,
     leadId: "CONTROLLED-TEST",
@@ -30,7 +51,7 @@ export async function sendControlledTestEmail({ env = process.env, transport }) 
     recipient: env.SALES_TEST_RECIPIENT,
     subject: TEST_SUBJECT,
     body: TEST_BODY,
-    idempotencyKey: testId
+    idempotencyKey
   });
 
   return {
