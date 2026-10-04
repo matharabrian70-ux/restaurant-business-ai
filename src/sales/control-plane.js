@@ -140,6 +140,34 @@ export class SalesControlPlane {
     return clone(approval);
   }
 
+  authorizeAutonomousOutreach(draftId, { actor = AUDIT_ACTORS.AGENT, reason = "Autonomous policy authorization" } = {}) {
+    const approval = this.approvals.get(draftId);
+    if (!approval) throw new Error("Approval request not found");
+    if (approval.status !== "pending") throw new Error("Approval request already decided");
+    if (actor !== AUDIT_ACTORS.AGENT) throw new Error("Autonomous authorization requires the agent actor");
+
+    const next = {
+      ...approval,
+      status: "approved",
+      mode: "autonomous_policy",
+      requestedAt: approval.requestedAt,
+      decidedAt: this.clock(),
+      decidedBy: actor,
+      reason
+    };
+
+    this.approvals.set(draftId, next);
+    this.auditLog = appendAudit(this.auditLog, createAuditEvent({
+      leadId: approval.leadId,
+      actor,
+      action: "outreach_autonomously_approved",
+      metadata: { draftId, mode: "autonomous_policy", reason },
+      timestamp: this.clock()
+    }));
+
+    return clone(next);
+  }
+
   decideOutreachApproval(draftId, approved, { actor = AUDIT_ACTORS.HUMAN, reason = "" } = {}) {
     if (actor !== AUDIT_ACTORS.HUMAN) throw new Error("Outreach approval requires a human actor");
     const approval = this.approvals.get(draftId);
