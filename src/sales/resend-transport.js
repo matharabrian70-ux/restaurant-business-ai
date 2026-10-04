@@ -2,7 +2,7 @@ import { Transport } from "./transport.js";
 
 export class ResendTransport extends Transport {
   constructor({ apiKey, from, fetchImpl = globalThis.fetch, apiBase = "https://api.resend.com" } = {}) {
-    super();
+    super("resend");
     if (!apiKey) throw new Error("RESEND_API_KEY is required");
     if (!from) throw new Error("RESEND_FROM is required");
     if (typeof fetchImpl !== "function") throw new Error("fetch implementation is required");
@@ -13,14 +13,17 @@ export class ResendTransport extends Transport {
     this.provider = "resend";
   }
 
-  async send({ recipient, subject, body, leadId, outreachId }) {
+  async send({ recipient, subject, body, leadId, outreachId, idempotencyKey }) {
     if (!recipient || !body) throw new Error("recipient and body are required");
+    const headers = {
+      "Authorization": "Bearer " + this.apiKey,
+      "Content-Type": "application/json"
+    };
+    if (idempotencyKey) headers["Idempotency-Key"] = String(idempotencyKey);
+
     const response = await this.fetchImpl(this.apiBase + "/emails", {
       method: "POST",
-      headers: {
-        "Authorization": "Bearer " + this.apiKey,
-        "Content-Type": "application/json"
-      },
+      headers,
       body: JSON.stringify({
         from: this.from,
         to: [recipient],
