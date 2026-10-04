@@ -21,6 +21,7 @@ export async function sendApproved({ draft, recipient, policy, transport }) {
     id: draft.id,
     leadId: draft.leadId,
     channel: draft.channel,
+    subject: draft.subject || "",
     body: draft.body,
     recipient: recipient.address
   });

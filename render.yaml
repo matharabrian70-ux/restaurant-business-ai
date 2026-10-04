@@ -30,3 +30,44 @@ services:
         sync: false
       - key: CONTROL_PLANE_TOKEN
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: AUTONOMOUS_SALES_ENABLED
+        value: "false"
+      - key: AUTONOMOUS_DAILY_LIMIT
+        value: "10"
+      - key: AUTONOMOUS_REQUIRE_CONSENT
+        value: "true"
+      - key: AUTONOMY_CONTROL_TOKEN
+        sync: false
+      - key: AUTONOMY_HANDOFF_RECIPIENT
+        sync: false
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
+
+  - type: cron
+    name: restaurant-business-ai-autonomous-worker
+    runtime: node
+    plan: 0.5c-512mb
+    buildCommand: npm install
+    startCommand: node autonomous-worker.js
+    schedule: "17 * * * *"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: AUTONOMOUS_SALES_ENABLED
+        value: "false"
+      - key: AUTONOMOUS_DAILY_LIMIT
+        value: "10"
+      - key: AUTONOMOUS_REQUIRE_CONSENT
+        value: "true"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: AUTONOMY_HANDOFF_RECIPIENT
+        sync: false
