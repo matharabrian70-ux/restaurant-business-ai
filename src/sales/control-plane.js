@@ -84,6 +84,17 @@ export class SalesControlPlane {
       throw new Error("Invalid lead transition: " + lead.stage + " -> " + nextStage);
     }
 
+    if (event.type === "outreach_sent") {
+      const approval = this.approvals.get(event.draftId);
+      if (!event.draftId) throw new Error("draftId is required to record outreach");
+      if (!approval || approval.leadId !== leadId) {
+        throw new Error("Outreach approval is required for this lead");
+      }
+      if (approval.status !== "approved") {
+        throw new Error("Outreach must be human-approved before it can be recorded as sent");
+      }
+    }
+
     const next = advanceLead(lead, event);
     this.leads.set(leadId, next);
     this.auditLog = appendAudit(this.auditLog, createAuditEvent({
@@ -104,6 +115,9 @@ export class SalesControlPlane {
       throw new Error("Only ready leads can request outreach approval");
     }
     if (!draftId) throw new Error("draftId is required");
+
+    const existing = this.approvals.get(draftId);
+    if (existing) throw new Error("Approval request already exists for this draft");
 
     const approval = {
       draftId,
@@ -153,6 +167,11 @@ export class SalesControlPlane {
   getApproval(draftId) {
     const approval = this.approvals.get(draftId);
     return approval ? clone(approval) : null;
+  }
+
+  isOutreachApproved(leadId, draftId) {
+    const approval = this.approvals.get(draftId);
+    return Boolean(approval && approval.leadId === leadId && approval.status === "approved");
   }
 
   getAuditLog(leadId) {
