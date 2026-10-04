@@ -9,6 +9,8 @@ export function createConfiguredTransport(env = process.env, fetchImpl = globalT
   if (!config.enabled) return null;
 
   if (config.name === "resend") {
+    if (!env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is required");
+
     const emailConfig = readProductionEmailConfig(env);
     const emailValidation = validateProductionEmailConfig(emailConfig);
     if (!emailValidation.ok) throw new Error(emailValidation.errors.join("; "));
