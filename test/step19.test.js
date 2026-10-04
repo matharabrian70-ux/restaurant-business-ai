@@ -25,7 +25,8 @@ test("pilot enforces unique recipients and daily limits", () => {
   assert.doesNotThrow(() => authorizePilotSend(pilot, { recipient: "A@example.com", dailySent: 0 }));
   recordPilotSend(pilot, { recipient: "A@example.com" });
   assert.throws(() => authorizePilotSend(pilot, { recipient: "a@example.com", dailySent: 1 }), /already been attempted/);
-  assert.throws(() => authorizePilotSend(pilot, { recipient: "b@example.com", dailySent: 2 }), /daily send limit/);
+  recordPilotSend(pilot, { recipient: "b@example.com" });
+  assert.throws(() => authorizePilotSend(pilot, { recipient: "c@example.com" }), /daily send limit/);
 });
 
 test("pilot automatically reports stop conditions", () => {
