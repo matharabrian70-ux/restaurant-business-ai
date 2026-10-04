@@ -1,5 +1,6 @@
 import http from "node:http";
 import { timingSafeEqual } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { createConfiguredTransport } from "./src/sales/provider-factory.js";
 import { sendControlledTestEmail } from "./src/sales/test-send.js";
 
@@ -55,7 +56,7 @@ export function buildServer(env = process.env, transport = null) {
   });
 }
 
-if (process.env.NODE_ENV !== "test") {
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = buildServer();
   server.listen(port, "0.0.0.0", () => {
     console.log(`restaurant-business-ai listening on port ${port}`);
