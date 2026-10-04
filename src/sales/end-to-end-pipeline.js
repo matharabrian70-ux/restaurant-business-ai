@@ -5,6 +5,7 @@ import { processResponse } from "./pipeline.js";
 import { sendThroughControlPlane } from "./control-plane-send.js";
 import { evaluateOutbound } from "./deliverability.js";
 import { LEAD_STAGES } from "../core/types.js";
+import { authorizePilotSend, evaluatePilot, recordPilotSend } from "./pilot.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -15,6 +16,7 @@ export class EndToEndSalesPipeline {
     controlPlane,
     transport,
     suppressionStore,
+    pilot = null,
     clock = () => new Date().toISOString()
   } = {}) {
     if (!controlPlane) throw new Error("controlPlane is required");
@@ -22,6 +24,7 @@ export class EndToEndSalesPipeline {
     this.controlPlane = controlPlane;
     this.transport = transport;
     this.suppressionStore = suppressionStore;
+    this.pilot = pilot;
     this.clock = clock;
     this.researchByLead = new Map();
     this.drafts = new Map();
@@ -139,6 +142,10 @@ export class EndToEndSalesPipeline {
     const draft = this.requireDraft(draftId);
     const recipient = { address: recipientAddress };
 
+    if (this.pilot) {
+      authorizePilotSend(this.pilot, { recipient: recipientAddress });
+    }
+
     evaluateOutbound({
       recipient,
       channel: draft.channel,
@@ -147,14 +154,36 @@ export class EndToEndSalesPipeline {
       policy
     });
 
-    const result = await sendThroughControlPlane({
-      controlPlane: this.controlPlane,
-      draft,
-      recipient,
-      policy,
-      transport: this.transport,
-      actor: "agent"
-    });
+    let result;
+    try {
+      result = await sendThroughControlPlane({
+        controlPlane: this.controlPlane,
+        draft,
+        recipient,
+        policy,
+        transport: this.transport,
+        actor: "agent"
+      });
+    } catch (error) {
+      if (this.pilot) {
+        recordPilotSend(this.pilot, { recipient: recipientAddress, success: false });
+        const evaluation = evaluatePilot(this.pilot);
+        if (!evaluation.safeToContinue) {
+          this.pilot.status = "paused";
+          this.pilot.lastEvaluation = { at: this.clock(), ...evaluation };
+        }
+      }
+      throw error;
+    }
+
+    if (this.pilot) {
+      recordPilotSend(this.pilot, { recipient: recipientAddress, success: true });
+      const evaluation = evaluatePilot(this.pilot);
+      if (!evaluation.safeToContinue) {
+        this.pilot.status = "paused";
+        this.pilot.lastEvaluation = { at: this.clock(), ...evaluation };
+      }
+    }
 
     const sentDraft = result.draft;
     this.drafts.set(draftId, sentDraft);
