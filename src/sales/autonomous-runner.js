@@ -29,7 +29,7 @@ export class AutonomousSalesRunner {
       allowedChannels: [channel],
       requireConsent,
       requireUnsubscribeMechanism: channel === "email",
-      hasUnsubscribeMechanism: channel === "email" || channel !== "email"
+      hasUnsubscribeMechanism: true
     });
     this.clock = clock;
     this.running = false;
