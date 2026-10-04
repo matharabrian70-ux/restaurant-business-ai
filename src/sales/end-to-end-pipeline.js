@@ -164,7 +164,8 @@ export class EndToEndSalesPipeline {
     draftId,
     recipientAddress,
     sender,
-    policy
+    policy,
+    consent
   } = {}) {
     const draft = this.requireDraft(draftId);
     const recipient = { address: recipientAddress };
@@ -178,7 +179,8 @@ export class EndToEndSalesPipeline {
       channel: draft.channel,
       suppressionStore: this.suppressionStore,
       sender,
-      policy
+      policy,
+      consent
     });
 
     let result;
