@@ -7,6 +7,9 @@ import { sendControlledTestEmail } from "./src/sales/test-send.js";
 import { SalesControlPlane } from "./src/sales/control-plane.js";
 import { createControlCentreApi } from "./src/sales/control-centre-api.js";
 import { renderControlCentre } from "./src/sales/control-centre-ui.js";
+import { AutonomousWorker } from "./src/autonomy/worker.js";
+import { createHandoffNotifier } from "./src/autonomy/notify.js";
+import { verifyResendWebhook } from "./src/autonomy/resend-webhook.js";
 
 const port = Number(process.env.PORT || 10000);
 
@@ -19,6 +22,18 @@ function tokensMatch(expected, supplied) {
   if (a.length !== b.length) return false;
 
   return timingSafeEqual(a, b);
+}
+
+async function readBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function autonomyTokenMatches(env, req) {
+  const auth = req.headers.authorization || "";
+  const supplied = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  return tokensMatch(env.AUTONOMY_CONTROL_TOKEN, supplied);
 }
 
 export function buildServer(
@@ -84,6 +99,72 @@ export function buildServer(
       );
 
       if (handled) return;
+    }
+
+    if (req.method === "POST" && pathname === "/autonomy/run") {
+      if (!autonomyTokenMatches(env, req)) {
+        res.writeHead(401, {"content-type":"application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      try {
+        const worker = new AutonomousWorker({
+          env,
+          transport: configuredTransport,
+          notify: env.AUTONOMY_HANDOFF_RECIPIENT
+            ? createHandoffNotifier({
+                transport: configuredTransport,
+                recipient: env.AUTONOMY_HANDOFF_RECIPIENT,
+                sender: env.RESEND_FROM
+              })
+            : null
+        });
+        const result = await worker.discoverAndSend();
+        await worker.store.close();
+        res.writeHead(200, {"content-type":"application/json"});
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(503, {"content-type":"application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/webhooks/resend") {
+      const payload = await readBody(req);
+
+      try {
+        verifyResendWebhook({
+          payload,
+          id: req.headers["svix-id"],
+          timestamp: req.headers["svix-timestamp"],
+          signature: req.headers["svix-signature"],
+          secret: env.RESEND_WEBHOOK_SECRET
+        });
+
+        const event = JSON.parse(payload);
+        const worker = new AutonomousWorker({
+          env,
+          transport: configuredTransport,
+          notify: env.AUTONOMY_HANDOFF_RECIPIENT
+            ? createHandoffNotifier({
+                transport: configuredTransport,
+                recipient: env.AUTONOMY_HANDOFF_RECIPIENT,
+                sender: env.RESEND_FROM
+              })
+            : null
+        });
+        const result = await worker.handleInbound(event);
+        await worker.store.close();
+
+        res.writeHead(200, {"content-type":"application/json"});
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(400, {"content-type":"application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
     }
 
     if (
