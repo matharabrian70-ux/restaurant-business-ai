@@ -117,6 +117,33 @@ export class EndToEndSalesPipeline {
     };
   }
 
+  authorizeAutonomousOutreach(draftId, { reason = "Autonomous policy authorization" } = {}) {
+    const draft = this.requireDraft(draftId);
+    if (draft.status !== "draft") {
+      throw new Error("Only a draft outreach can be autonomously authorized");
+    }
+
+    const approval = this.controlPlane.authorizeAutonomousOutreach(
+      draftId,
+      { actor: "agent", reason }
+    );
+
+    const approvedDraft = {
+      ...draft,
+      status: "approved",
+      approvedBy: "autonomous_policy",
+      approvedAt: this.clock(),
+      requiresHumanApproval: false
+    };
+
+    this.drafts.set(draftId, approvedDraft);
+
+    return {
+      draft: clone(approvedDraft),
+      approval
+    };
+  }
+
   rejectOutreach(draftId, { reason = "Rejected by human operator" } = {}) {
     const draft = this.requireDraft(draftId);
     const approval = this.controlPlane.decideOutreachApproval(
