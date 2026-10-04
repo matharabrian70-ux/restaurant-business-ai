@@ -63,6 +63,7 @@ test("autonomous authorization creates a policy approval", async () => {
       location: "Nairobi",
       source: "manual",
       email: "owner@example.com",
+      consentState: "allowed",
       website: "https://example.com"
     }
   ]);
@@ -97,14 +98,16 @@ test("autonomous runner respects pilot daily limit", async () => {
       name: "First Restaurant",
       location: "Nairobi",
       source: "manual",
-      email: "first@example.com"
+      email: "first@example.com",
+      consentState: "allowed"
     },
     {
       id: "REST-AUTO-3",
       name: "Second Restaurant",
       location: "Nairobi",
       source: "manual",
-      email: "second@example.com"
+      email: "second@example.com",
+      consentState: "allowed"
     }
   ]);
 
