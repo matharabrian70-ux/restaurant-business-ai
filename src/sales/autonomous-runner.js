@@ -21,6 +21,10 @@ export class AutonomousSalesRunner {
 
     this.pipeline = pipeline;
     this.pilot = pilot;
+    if (this.pipeline.pilot && this.pipeline.pilot !== this.pilot) {
+      throw new Error("Pipeline pilot and runner pilot must be the same instance");
+    }
+    this.pipeline.pilot = this.pilot;
     this.enabled = enabled;
     this.requireConsent = requireConsent;
     this.channel = channel;
