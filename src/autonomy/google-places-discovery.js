@@ -58,7 +58,30 @@ export async function discoverFromGooglePlaces({
     });
 
     if (!response.ok) {
-      throw new Error(`Google Places discovery failed: HTTP ${response.status}`);
+      let detail = "";
+      try {
+        const errorBody = await response.json();
+        const apiError = errorBody?.error;
+        if (apiError && typeof apiError === "object") {
+          const status = apiError.status ? String(apiError.status) : "";
+          const message = apiError.message ? String(apiError.message) : "";
+          const reasons = Array.isArray(apiError.details)
+            ? apiError.details
+                .map((item) => item?.reason || item?.description)
+                .filter(Boolean)
+                .map(String)
+            : [];
+          detail = [status, message, ...reasons].filter(Boolean).join(" — ");
+        } else if (typeof errorBody?.error === "string") {
+          detail = errorBody.error;
+        }
+      } catch {
+        // Keep the diagnostic safe and useful even if Google returns non-JSON.
+      }
+
+      throw new Error(
+        `Google Places discovery failed: HTTP ${response.status}${detail ? ` — ${detail}` : ""}`
+      );
     }
 
     const data = await response.json();
