@@ -10,12 +10,12 @@ import { createPilot } from "../src/sales/pilot.js";
 function makeTransport() {
   return {
     name: "test",
-    async send({ draft, recipient }) {
+    async send({ id, recipient }) {
       return {
         messageId: "msg-test",
         transport: "test",
         recipient,
-        draftId: draft.id
+        draftId: id
       };
     }
   };
