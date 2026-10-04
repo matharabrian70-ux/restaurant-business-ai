@@ -36,7 +36,10 @@ export function buildServer(
   });
 
   return http.createServer(async (req, res) => {
-    if (req.method === "GET" && req.url === "/health") {
+    const requestUrl = new URL(req.url || "/", "http://localhost");
+    const pathname = requestUrl.pathname;
+
+    if (req.method === "GET" && pathname === "/health") {
       res.writeHead(200, {
         "content-type": "application/json"
       });
@@ -51,7 +54,7 @@ export function buildServer(
       return;
     }
 
-    if (req.method === "GET" && req.url === "/control") {
+    if (req.method === "GET" && pathname === "/control") {
       if (!env.CONTROL_PLANE_TOKEN) {
         res.writeHead(503, {
           "content-type": "text/plain; charset=utf-8"
@@ -74,7 +77,7 @@ export function buildServer(
       return;
     }
 
-    if (req.url?.startsWith("/control/")) {
+    if (pathname.startsWith("/control/")) {
       const handled = await handleControlRequest(
         req,
         res
@@ -85,7 +88,7 @@ export function buildServer(
 
     if (
       req.method === "POST" &&
-      req.url === "/test-email"
+      pathname === "/test-email"
     ) {
       const auth =
         req.headers.authorization || "";
