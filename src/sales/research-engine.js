@@ -12,7 +12,7 @@ export function scoreResearch(input = {}) {
   const research = normalizeResearch(input);
   const signals = input.signals ?? {};
   let digitalGap = 0;
-  if (research.hasWebsite === false) digitalGap += 15;
+  if (input.hasWebsite === false || research.website === null) digitalGap += 15;
   if (research.hasOnlineOrdering === false) digitalGap += 10;
   if (research.deliveryAvailable === false) digitalGap += 5;
 
