@@ -106,6 +106,7 @@ export function discoverProspects(records, { minQuality = 0 } = {}) {
   return {
     prospects: unique.map((record) => createProspect({
       ...record,
+      id: record.id ?? ("DISC-" + record.identity.replace(/[^a-z0-9]+/gi, "-").slice(0, 80)),
       source: record.source,
       website: record.website,
       contact: { phone: record.phone, email: record.email }
