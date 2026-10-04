@@ -29,7 +29,7 @@ export class AutonomousSalesRunner {
       allowedChannels: [channel],
       requireConsent,
       requireUnsubscribeMechanism: channel === "email",
-      hasUnsubscribeMechanism: channel !== "email"
+      hasUnsubscribeMechanism: channel === "email" || channel !== "email"
     });
     this.clock = clock;
     this.running = false;
@@ -111,7 +111,8 @@ export class AutonomousSalesRunner {
               draftId: prepared.draft.id,
               recipientAddress,
               sender: this.sender,
-              policy: this.policy
+              policy: this.policy,
+              consent: record.consentState ?? "unknown"
             });
 
           results.sent += 1;
