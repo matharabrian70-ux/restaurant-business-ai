@@ -19,8 +19,11 @@ export async function discoverFromConfiguredSource({
     return discoverFromGooglePlaces({
       apiKey: env.GOOGLE_PLACES_API_KEY,
       queries: String(env.AUTONOMOUS_DISCOVERY_QUERIES || "restaurants in Nairobi, Kenya")
-        .split("|").map((q) => q.trim()).filter(Boolean),
+        .split("|")
+        .map((q) => q.trim())
+        .filter(Boolean),
       maxPerQuery: Number(env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
+      maxResults: Number(env.AUTONOMOUS_DISCOVERY_DAILY_TARGET || env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
       fetchImpl
     });
   }
