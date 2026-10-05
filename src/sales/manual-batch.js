@@ -90,7 +90,7 @@ export function createManualSalesRuntime({
       .filter((record) => preparedLeadIds.has(record.id))
       .map((record) => {
         const state = pipeline.getLeadState(record.id);
-        return state;
+        return state ? { ...state, pilotRecord: record } : null;
       })
       .filter(Boolean)
       .map(clone);
@@ -113,7 +113,11 @@ export function createManualSalesRuntime({
 
     for (const state of states) {
       for (const draft of state.drafts ?? []) {
-        if (draft.status === "approved" && state.lead.contact?.email) {
+        if (
+          draft.status === "approved" &&
+          state.lead.contact?.email &&
+          state.pilotRecord?.consentState === "allowed"
+        ) {
           approved.push({
             draft,
             recipientAddress: state.lead.contact.email
