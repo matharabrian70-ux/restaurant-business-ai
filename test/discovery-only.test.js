@@ -59,11 +59,11 @@ test("discovery-only test stores public restaurant data and sends nothing", asyn
   const result = await runDiscoveryOnlyTest({
     env: {
       AUTONOMOUS_DISCOVERY_PROVIDER: "osm",
-      AUTONOMOUS_SALES_ENABLED: "false"
+      AUTONOMOUS_SALES_ENABLED: "false",
+      AUTONOMOUS_OVERPASS_ENDPOINT: "https://overpass-api.de/api/interpreter",
+      AUTONOMOUS_OVERPASS_FALLBACK_ENDPOINTS: ""
     },
     store,
-    endpoint: "https://overpass-api.de/api/interpreter",
-    fallbackEndpoints: "",
     fetchImpl
   });
 
