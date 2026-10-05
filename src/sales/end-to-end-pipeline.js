@@ -174,7 +174,7 @@ export class EndToEndSalesPipeline {
     const recipient = { address: recipientAddress };
 
     if (!this.controlPlane.isOutreachApproved(draft.leadId, draft.id)) {
-      throw new Error("Sales control plane approval is required before sending");
+      throw new Error("Outreach must be approved by the Sales Control Plane before sending");
     }
 
     if (this.pilot) {
