@@ -24,7 +24,8 @@ export async function sendApproved({ draft, recipient, policy, transport, replyT
     subject: draft.subject || "",
     body: draft.body,
     recipient: recipient.address,
-    replyTo
+    replyTo,
+    idempotencyKey: draft.id
   });
 
   const sent = markOutreachSent(draft, result);
