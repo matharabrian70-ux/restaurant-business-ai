@@ -192,6 +192,30 @@ export class SalesControlPlane {
     return clone(next);
   }
 
+  approveAllPendingOutreach({ limit = 25, reason = "Human operator approved the current outreach batch" } = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+      throw new Error("limit must be between 1 and 50");
+    }
+
+    const pending = [...this.approvals.values()]
+      .filter((approval) => approval.status === "pending")
+      .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime())
+      .slice(0, limit);
+
+    const approved = pending.map((approval) =>
+      this.decideOutreachApproval(approval.draftId, true, {
+        actor: AUDIT_ACTORS.HUMAN,
+        reason
+      })
+    );
+
+    return {
+      requested: pending.length,
+      approved: approved.length,
+      approvals: approved
+    };
+  }
+
   getApproval(draftId) {
     const approval = this.approvals.get(draftId);
     return approval ? clone(approval) : null;

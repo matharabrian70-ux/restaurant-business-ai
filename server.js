@@ -12,6 +12,8 @@ import { createHandoffNotifier } from "./src/autonomy/notify.js";
 import { verifyResendWebhook } from "./src/autonomy/resend-webhook.js";
 import { runDiscoveryOnlyTest } from "./src/autonomy/discovery-test.js";
 import { PostgresAutonomyStore } from "./src/autonomy/postgres-store.js";
+import { ComplianceStore } from "./src/sales/compliance-store.js";
+import { createManualSalesRuntime } from "./src/sales/manual-batch.js";
 
 const port = Number(process.env.PORT || 10000);
 
@@ -45,6 +47,13 @@ export function buildServer(
 ) {
   const configuredTransport =
     transport || createConfiguredTransport(env);
+
+  const complianceStore = new ComplianceStore();
+  const manualSalesRuntime = createManualSalesRuntime({
+    controlPlane,
+    transport: configuredTransport,
+    suppressionStore: complianceStore.suppressions
+  });
 
   const handleControlRequest = createControlCentreApi({
     controlPlane,
@@ -91,6 +100,48 @@ export function buildServer(
 
       res.end(renderControlCentre());
 
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/control/pilot/drafts") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"});
+      res.end(JSON.stringify({
+        drafts: manualSalesRuntime.listPreparedDrafts()
+      }));
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/control/pilot/prepare") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      try {
+        const result = manualSalesRuntime.preparePilotBatch({ limit: 25 });
+        res.writeHead(200, {"content-type": "application/json"});
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(400, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
       return;
     }
 

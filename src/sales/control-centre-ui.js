@@ -206,6 +206,14 @@ export function renderControlCentre() {
         Disconnect
       </button>
 
+      <button class="primary" onclick="preparePilot()">
+        Prepare approved 25
+      </button>
+
+      <button class="primary" onclick="approveAllPending()">
+        Approve all pending
+      </button>
+
       <div id="message"></div>
     </section>
 
@@ -239,6 +247,17 @@ export function renderControlCentre() {
 
       <div id="queue">
         Connect to load the queue.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>AI-Generated Outreach</h2>
+        <button class="muted" onclick="loadDrafts()">Refresh drafts</button>
+      </div>
+
+      <div id="drafts">
+        Prepare the approved pilot batch to generate personalized drafts.
       </div>
     </section>
 
@@ -333,13 +352,15 @@ export function renderControlCentre() {
     }
 
     try {
-      const [queueData, approvalData] = await Promise.all([
+      const [queueData, approvalData, draftData] = await Promise.all([
         api("/control/queue"),
-        api("/control/approvals")
+        api("/control/approvals"),
+        api("/control/pilot/drafts")
       ]);
 
       renderQueue(queueData.queue);
       renderApprovals(approvalData.approvals);
+      renderDrafts(draftData.drafts);
       updateStats(queueData.queue, approvalData.approvals);
 
       setMessage("Control Centre synchronized.");
@@ -452,6 +473,86 @@ export function renderControlCentre() {
         </div>
       \`;
     }).join("");
+  }
+
+  async function preparePilot() {
+    try {
+      const result = await api("/control/pilot/prepare", {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+
+      setMessage(
+        "Prepared " + result.prepared +
+        " personalized drafts; " + result.noVerifiedEmail +
+        " held because no verified public business email was found."
+      );
+
+      await loadAll();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function approveAllPending() {
+    if (!confirm("Approve all currently pending outreach drafts? This records one explicit human batch approval.")) {
+      return;
+    }
+
+    try {
+      const result = await api("/control/approvals/approve-all", {
+        method: "POST",
+        body: JSON.stringify({
+          limit: 25,
+          reason: "Human operator explicitly approved the current 25-prospect batch"
+        })
+      });
+
+      setMessage("Approved " + result.approved + " outreach drafts.");
+      await loadAll();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function loadDrafts() {
+    try {
+      const data = await api("/control/pilot/drafts");
+      renderDrafts(data.drafts);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  function renderDrafts(states) {
+    const container = document.getElementById("drafts");
+    const drafts = states.flatMap(state =>
+      (state.drafts || []).map(draft => ({
+        ...draft,
+        restaurant: state.lead?.name || draft.leadId,
+        email: state.lead?.contact?.email || ""
+      }))
+    );
+
+    if (!drafts.length) {
+      container.textContent = "No personalized drafts prepared yet.";
+      return;
+    }
+
+    container.innerHTML = drafts.map(draft =>
+      '<div class="approval">' +
+        '<strong>' + escapeHtml(draft.restaurant) + '</strong>' +
+        '<div class="meta">To: ' + escapeHtml(draft.email) + '</div>' +
+        '<div class="meta">Subject: ' + escapeHtml(draft.subject) + '</div>' +
+        '<div class="meta">Strategy: ' + escapeHtml(draft.personalization?.strategy || "personalized") + '</div>' +
+        '<details style="margin-top:10px">' +
+          '<summary>Preview email</summary>' +
+          '<pre style="white-space:pre-wrap;font:inherit;line-height:1.5;margin-top:10px">' +
+            escapeHtml(draft.body) +
+          '</pre>' +
+        '</details>' +
+      '</div>'
+    ).join("");
   }
 
   async function decideApproval(encodedDraftId, approved) {
