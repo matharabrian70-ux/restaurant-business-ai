@@ -13,7 +13,7 @@ export class ResendTransport extends Transport {
     this.provider = "resend";
   }
 
-  async send({ recipient, subject, body, leadId, outreachId, idempotencyKey }) {
+  async send({ recipient, subject, body, leadId, outreachId, idempotencyKey, replyTo }) {
     if (!recipient || !body) throw new Error("recipient and body are required");
     const headers = {
       "Authorization": "Bearer " + this.apiKey,
@@ -29,6 +29,7 @@ export class ResendTransport extends Transport {
         to: [recipient],
         subject: subject || "",
         text: body,
+        ...(replyTo ? { reply_to: replyTo } : {}),
         headers: { "X-Lead-ID": String(leadId || ""), "X-Outreach-ID": String(outreachId || "") }
       })
     });
