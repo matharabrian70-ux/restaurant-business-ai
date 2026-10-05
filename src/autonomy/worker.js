@@ -34,6 +34,7 @@ export class AutonomousWorker {
   async init() {
     await this.store.init();
     let pilot = await this.store.get("pilot");
+
     if (!pilot) {
       pilot = createPilot({
         enabled: envBoolean(this.env.AUTONOMOUS_SALES_ENABLED, false),
@@ -41,7 +42,24 @@ export class AutonomousWorker {
         dailyLimit: Number(this.env.AUTONOMOUS_DAILY_LIMIT || 10)
       });
       await this.store.set("pilot", pilot);
+      return pilot;
     }
+
+    // The environment kill switch must be authoritative even when an older
+    // active pilot is already persisted in Postgres.
+    if (
+      envBoolean(this.env.AUTONOMOUS_SALES_ENABLED, false) === false &&
+      pilot.status === PILOT_STATUS.ACTIVE
+    ) {
+      pilot = {
+        ...pilot,
+        status: PILOT_STATUS.DISABLED,
+        pauseReason: "AUTONOMOUS_SALES_ENABLED is false",
+        updatedAt: new Date().toISOString()
+      };
+      await this.store.set("pilot", pilot);
+    }
+
     return pilot;
   }
 
