@@ -1,4 +1,8 @@
 const DEFAULT_OVERPASS_ENDPOINT = "https://overpass.private.coffee/api/interpreter";
+const DEFAULT_OVERPASS_FALLBACK_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+];
 const DEFAULT_BBOX = "-1.45,36.65,-1.15,37.05";
 const DEFAULT_TILE_DEGREES = 0.1;
 const DEFAULT_MAX_TILES = 32;
@@ -138,7 +142,7 @@ async function fetchWebsiteEmail(website, fetchImpl) {
 }
 
 async function fetchOverpassTile({
-  endpoint,
+  endpoints,
   tile,
   elementType,
   perTileLimit,
@@ -164,8 +168,9 @@ async function fetchOverpassTile({
 
   let lastError;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let timeout;
+  for (const endpoint of endpoints) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let timeout;
     try {
       if (deadlineAt && Date.now() >= deadlineAt) {
         throw new Error("OpenStreetMap discovery max runtime reached");
@@ -208,13 +213,19 @@ async function fetchOverpassTile({
         isRetryableNetworkError(error);
 
       if (timeout) clearTimeout(timeout);
-      if (!retryable || attempt >= maxAttempts) {
+      if (!retryable) {
         throw lastError;
+      }
+
+      if (attempt >= maxAttempts) {
+        lastError = new Error(`${lastError.message} (endpoint: ${endpoint})`);
+        break;
       }
 
       const jitteredDelay = retryDelayMs * 2 ** (attempt - 1) * (0.5 + Math.random());
       const delay = Math.max(jitteredDelay, Number(error?.retryAfterMs) || 0);
       await sleepImpl(delay);
+      }
     }
   }
 
@@ -278,6 +289,7 @@ export async function discoverFromOpenStreetMap({
   bbox = process.env.AUTONOMOUS_DISCOVERY_BBOX || DEFAULT_BBOX,
   maxResults = Number(process.env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
   endpoint = process.env.AUTONOMOUS_OVERPASS_ENDPOINT || DEFAULT_OVERPASS_ENDPOINT,
+  fallbackEndpoints = process.env.AUTONOMOUS_OVERPASS_FALLBACK_ENDPOINTS || DEFAULT_OVERPASS_FALLBACK_ENDPOINTS.join(","),
   tileDegrees = Number(process.env.AUTONOMOUS_DISCOVERY_TILE_DEGREES || DEFAULT_TILE_DEGREES),
   maxTiles = Number(process.env.AUTONOMOUS_DISCOVERY_MAX_TILES || DEFAULT_MAX_TILES),
   maxAttempts = Number(process.env.AUTONOMOUS_DISCOVERY_MAX_ATTEMPTS || DEFAULT_MAX_ATTEMPTS),
@@ -296,6 +308,15 @@ export async function discoverFromOpenStreetMap({
   const safeRequestTimeoutMs = Math.min(120_000, Math.max(5_000, Number(requestTimeoutMs) || DEFAULT_REQUEST_TIMEOUT_MS));
   const safeMaxRuntimeMs = Math.min(600_000, Math.max(30_000, Number(maxRuntimeMs) || DEFAULT_MAX_RUNTIME_MS));
   const startedAt = Date.now();
+
+  const configuredEndpoints = [
+    endpoint,
+    ...String(fallbackEndpoints)
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+  ];
+  const endpoints = [...new Set(configuredEndpoints)].slice(0, 3);
 
   const parsedBbox = parseBbox(bbox);
   const tiles = rotateTiles(
@@ -331,7 +352,7 @@ export async function discoverFromOpenStreetMap({
 
       try {
         const data = await fetchOverpassTile({
-          endpoint,
+          endpoints,
           tile,
           elementType,
           perTileLimit: perTypeLimit,
