@@ -13,7 +13,7 @@ export function validateSend({ draft, recipient, policy = {} }) {
   return true;
 }
 
-export async function sendApproved({ draft, recipient, policy, transport }) {
+export async function sendApproved({ draft, recipient, policy, transport, replyTo }) {
   validateSend({ draft, recipient, policy });
   if (!transport?.send) throw new Error("Transport is required");
 
@@ -23,7 +23,8 @@ export async function sendApproved({ draft, recipient, policy, transport }) {
     channel: draft.channel,
     subject: draft.subject || "",
     body: draft.body,
-    recipient: recipient.address
+    recipient: recipient.address,
+    replyTo
   });
 
   const sent = markOutreachSent(draft, result);

@@ -84,12 +84,21 @@ test("end-to-end pipeline reaches human handoff without autonomous sending", asy
   const result = await pipeline.sendApprovedOutreach({
     draftId: prepared.draft.id,
     recipientAddress: "owner@example.restaurant",
-    sender: { address: "hello@matharadigital.dev", verified: true },
+    sender: {
+      address: "hello@matharadigital.dev",
+      replyTo: "hello@matharadigital.dev",
+      verified: true
+    },
     policy: {
       allowedChannels: ["email"],
       requireConsent: false,
-      requireUnsubscribeMechanism: false,
+      requireUnsubscribeMechanism: true,
       hasUnsubscribeMechanism: true
+    },
+    consent: "allowed",
+    consentEvidence: {
+      source: "test fixture: restaurant requested a demo",
+      at: "2026-10-04T00:00:00.000Z"
     }
   });
 

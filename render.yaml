@@ -18,6 +18,10 @@ services:
         sync: false
       - key: RESEND_FROM
         sync: false
+      - key: RESEND_REPLY_TO
+        sync: false
+      - key: SALES_B2B_OUTREACH_ENABLED
+        value: "false"
       - key: RESEND_SENDING_DOMAIN
         sync: false
       - key: RESEND_DOMAIN_VERIFIED

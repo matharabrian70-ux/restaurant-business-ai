@@ -6,6 +6,7 @@ import { sendThroughControlPlane } from "./control-plane-send.js";
 import { evaluateOutbound } from "./deliverability.js";
 import { LEAD_STAGES } from "../core/types.js";
 import { authorizePilotSend, evaluatePilot, recordPilotSend } from "./pilot.js";
+import { createDirectMarketingPolicy, validateDirectMarketingEligibility } from "./direct-marketing-policy.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -165,10 +166,16 @@ export class EndToEndSalesPipeline {
     recipientAddress,
     sender,
     policy,
-    consent
+    consent,
+    consentEvidence,
+    directMarketingPolicy = createDirectMarketingPolicy()
   } = {}) {
     const draft = this.requireDraft(draftId);
     const recipient = { address: recipientAddress };
+
+    if (!this.controlPlane.isOutreachApproved(draft.leadId, draft.id)) {
+      throw new Error("Outreach must be approved by the Sales Control Plane before sending");
+    }
 
     if (this.pilot) {
       authorizePilotSend(this.pilot, { recipient: recipientAddress });
@@ -183,6 +190,19 @@ export class EndToEndSalesPipeline {
       consent
     });
 
+    const directMarketing = validateDirectMarketingEligibility({
+      recipient,
+      consent,
+      consentEvidence,
+      sender,
+      messageBody: draft.body,
+      policy: directMarketingPolicy
+    });
+
+    if (!directMarketing.eligible) {
+      throw new Error("Direct marketing eligibility failed: " + directMarketing.errors.join("; "));
+    }
+
     let result;
     try {
       result = await sendThroughControlPlane({
@@ -191,6 +211,7 @@ export class EndToEndSalesPipeline {
         recipient,
         policy,
         transport: this.transport,
+        replyTo: sender.replyTo,
         actor: "agent"
       });
     } catch (error) {

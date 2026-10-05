@@ -1,19 +1,20 @@
 import { Transport } from "./transport.js";
 
 export class ResendTransport extends Transport {
-  constructor({ apiKey, from, fetchImpl = globalThis.fetch, apiBase = "https://api.resend.com" } = {}) {
+  constructor({ apiKey, from, replyTo, fetchImpl = globalThis.fetch, apiBase = "https://api.resend.com" } = {}) {
     super("resend");
     if (!apiKey) throw new Error("RESEND_API_KEY is required");
     if (!from) throw new Error("RESEND_FROM is required");
     if (typeof fetchImpl !== "function") throw new Error("fetch implementation is required");
     this.apiKey = apiKey;
     this.from = from;
+    this.replyTo = replyTo || from;
     this.fetchImpl = fetchImpl;
     this.apiBase = apiBase.replace(/\/$/, "");
     this.provider = "resend";
   }
 
-  async send({ recipient, subject, body, leadId, outreachId, idempotencyKey }) {
+  async send({ recipient, subject, body, leadId, outreachId, idempotencyKey, replyTo }) {
     if (!recipient || !body) throw new Error("recipient and body are required");
     const headers = {
       "Authorization": "Bearer " + this.apiKey,
@@ -29,6 +30,7 @@ export class ResendTransport extends Transport {
         to: [recipient],
         subject: subject || "",
         text: body,
+        ...(replyTo || this.replyTo ? { reply_to: replyTo || this.replyTo } : {}),
         headers: { "X-Lead-ID": String(leadId || ""), "X-Outreach-ID": String(outreachId || "") }
       })
     });

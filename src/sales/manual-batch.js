@@ -1,6 +1,7 @@
 import { EndToEndSalesPipeline } from "./end-to-end-pipeline.js";
 import { createDeliverabilityPolicy } from "./deliverability.js";
 import PILOT_PROSPECTS from "./pilot-prospects.js";
+import { createDirectMarketingPolicy } from "./direct-marketing-policy.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -20,6 +21,7 @@ export function createManualSalesRuntime({
   });
 
   const preparedLeadIds = new Set();
+  const consentOverrides = new Map();
 
   function preparePilotBatch({ limit = 25 } = {}) {
     if (!Number.isInteger(limit) || limit < 1 || limit > PILOT_PROSPECTS.length) {
@@ -96,6 +98,17 @@ export function createManualSalesRuntime({
       .map(clone);
   }
 
+  function recordRecipientConsent({ id, source, at = new Date().toISOString() } = {}) {
+    if (!id || !source) throw new Error("Prospect id and consent source are required");
+    if (!preparedLeadIds.has(id)) throw new Error("Prospect must be prepared before consent can be recorded");
+    consentOverrides.set(id, {
+      state: "allowed",
+      source: String(source).slice(0, 500),
+      at
+    });
+    return { id, ...consentOverrides.get(id) };
+  }
+
   async function sendApprovedBatch({
     limit = 25,
     sender,
@@ -104,7 +117,8 @@ export function createManualSalesRuntime({
       requireConsent: true,
       requireUnsubscribeMechanism: true,
       hasUnsubscribeMechanism: true
-    })
+    }),
+    directMarketingPolicy = createDirectMarketingPolicy()
   } = {}) {
     if (!sender) throw new Error("Sender is required");
 
@@ -116,11 +130,12 @@ export function createManualSalesRuntime({
         if (
           draft.status === "approved" &&
           state.lead.contact?.email &&
-          state.pilotRecord?.consentState === "allowed"
+          consentOverrides.get(state.pilotRecord.id)?.state === "allowed"
         ) {
           approved.push({
             draft,
-            recipientAddress: state.lead.contact.email
+            recipientAddress: state.lead.contact.email,
+            consentEvidence: consentOverrides.get(state.pilotRecord.id)
           });
         }
       }
@@ -136,7 +151,9 @@ export function createManualSalesRuntime({
           recipientAddress: item.recipientAddress,
           sender,
           policy,
-          consent: { state: "allowed" }
+          consent: { state: "allowed" },
+          consentEvidence: item.consentEvidence,
+          directMarketingPolicy
         });
         results.push({ status: "sent", ...result });
       } catch (error) {
@@ -161,6 +178,7 @@ export function createManualSalesRuntime({
     pipeline,
     preparePilotBatch,
     listPreparedDrafts,
+    recordRecipientConsent,
     sendApprovedBatch
   };
 }
