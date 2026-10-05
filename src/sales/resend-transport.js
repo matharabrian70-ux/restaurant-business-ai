@@ -77,7 +77,7 @@ export class ResendTransport extends Transport {
     this.sleepImpl = sleepImpl;
   }
 
-  async send({ recipient, subject, body, leadId, outreachId, idempotencyKey, replyTo }) {
+  async send({ recipient, subject, body, html, attachments, leadId, outreachId, idempotencyKey, replyTo }) {
     if (!recipient || !body) throw new Error("recipient and body are required");
 
     const headers = {
@@ -86,20 +86,24 @@ export class ResendTransport extends Transport {
     };
     if (idempotencyKey) headers["Idempotency-Key"] = String(idempotencyKey);
 
+    const payload = {
+      from: this.from,
+      to: [recipient],
+      subject: subject || "",
+      text: body,
+      ...(html ? { html } : {}),
+      ...(replyTo || this.replyTo ? { reply_to: replyTo || this.replyTo } : {}),
+      ...(Array.isArray(attachments) && attachments.length ? { attachments } : {}),
+      headers: {
+        "X-Lead-ID": String(leadId || ""),
+        "X-Outreach-ID": String(outreachId || "")
+      }
+    };
+
     const request = {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        from: this.from,
-        to: [recipient],
-        subject: subject || "",
-        text: body,
-        ...(replyTo || this.replyTo ? { reply_to: replyTo || this.replyTo } : {}),
-        headers: {
-          "X-Lead-ID": String(leadId || ""),
-          "X-Outreach-ID": String(outreachId || "")
-        }
-      })
+      body: JSON.stringify(payload)
     };
 
     let lastError;
