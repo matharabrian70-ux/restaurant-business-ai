@@ -36,8 +36,10 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
-      - key: GOOGLE_PLACES_API_KEY
-        sync: false
+      - key: AUTONOMOUS_DISCOVERY_PROVIDER
+        value: "osm"
+      - key: AUTONOMOUS_DISCOVERY_BBOX
+        value: "-1.45,36.65,-1.15,37.05"
       - key: AUTONOMOUS_SALES_ENABLED
         value: "false"
       - key: AUTONOMOUS_DAILY_LIMIT
@@ -61,8 +63,10 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: GOOGLE_PLACES_API_KEY
-        sync: false
+      - key: AUTONOMOUS_DISCOVERY_PROVIDER
+        value: "osm"
+      - key: AUTONOMOUS_DISCOVERY_BBOX
+        value: "-1.45,36.65,-1.15,37.05"
       - key: AUTONOMOUS_SALES_ENABLED
         value: "false"
       - key: AUTONOMOUS_DAILY_LIMIT
