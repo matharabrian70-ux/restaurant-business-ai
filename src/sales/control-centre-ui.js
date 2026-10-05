@@ -483,7 +483,9 @@ export function renderControlCentre() {
       });
 
       setMessage(
-        `Prepared ${result.prepared} personalized drafts; ${result.noVerifiedEmail} held because no verified public business email was found.`
+        "Prepared " + result.prepared +
+        " personalized drafts; " + result.noVerifiedEmail +
+        " held because no verified public business email was found."
       );
 
       await loadAll();
@@ -506,7 +508,7 @@ export function renderControlCentre() {
         })
       });
 
-      setMessage(`Approved ${result.approved} outreach drafts.`);
+      setMessage("Approved " + result.approved + " outreach drafts.");
       await loadAll();
     } catch (error) {
       setMessage(error.message);
@@ -537,18 +539,20 @@ export function renderControlCentre() {
       return;
     }
 
-    container.innerHTML = drafts.map(draft => `
-      <div class="approval">
-        <strong>${escapeHtml(draft.restaurant)}</strong>
-        <div class="meta">To: ${escapeHtml(draft.email)}</div>
-        <div class="meta">Subject: ${escapeHtml(draft.subject)}</div>
-        <div class="meta">Strategy: ${escapeHtml(draft.personalization?.strategy || "personalized")}</div>
-        <details style="margin-top:10px">
-          <summary>Preview email</summary>
-          <pre style="white-space:pre-wrap;font:inherit;line-height:1.5;margin-top:10px">${escapeHtml(draft.body)}</pre>
-        </details>
-      </div>
-    `).join("");
+    container.innerHTML = drafts.map(draft =>
+      '<div class="approval">' +
+        '<strong>' + escapeHtml(draft.restaurant) + '</strong>' +
+        '<div class="meta">To: ' + escapeHtml(draft.email) + '</div>' +
+        '<div class="meta">Subject: ' + escapeHtml(draft.subject) + '</div>' +
+        '<div class="meta">Strategy: ' + escapeHtml(draft.personalization?.strategy || "personalized") + '</div>' +
+        '<details style="margin-top:10px">' +
+          '<summary>Preview email</summary>' +
+          '<pre style="white-space:pre-wrap;font:inherit;line-height:1.5;margin-top:10px">' +
+            escapeHtml(draft.body) +
+          '</pre>' +
+        '</details>' +
+      '</div>'
+    ).join("");
   }
 
   async function decideApproval(encodedDraftId, approved) {
