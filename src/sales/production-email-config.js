@@ -1,6 +1,6 @@
 const EMAIL_PATTERN = /^[^@\s]+@([^@\s]+)$/;
 
-function senderAddress(value = "") {
+export function extractSenderAddress(value = "") {
   const match = String(value).match(/<([^>]+)>/);
   return String(match ? match[1] : value).trim().toLowerCase();
 }
@@ -15,7 +15,7 @@ export function readProductionEmailConfig(env = process.env) {
 }
 
 export function extractSenderDomain(from = "") {
-  const address = senderAddress(from);
+  const address = extractSenderAddress(from);
   const match = address.match(EMAIL_PATTERN);
   return match ? match[1].toLowerCase() : null;
 }
