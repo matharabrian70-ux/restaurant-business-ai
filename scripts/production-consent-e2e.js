@@ -15,7 +15,6 @@ export async function runProductionConsentE2E(env = process.env) {
   assert(env.DATABASE_URL, "DATABASE_URL is required");
   assert(env.RESEND_API_KEY, "RESEND_API_KEY is required");
   assert(env.RESEND_FROM, "RESEND_FROM is required");
-  assert(env.RESEND_REPLY_TO, "RESEND_REPLY_TO is required");
   assert(env.RESEND_DOMAIN_VERIFIED === "true", "RESEND_DOMAIN_VERIFIED must be true");
 
   const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
