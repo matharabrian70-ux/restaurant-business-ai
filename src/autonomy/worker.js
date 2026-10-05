@@ -43,7 +43,7 @@ export class AutonomousWorker {
   }
 
   async discoverAndSend() {
-    const pilot = await this.init();
+    let pilot = await this.init();
     if (pilot.status !== PILOT_STATUS.ACTIVE) {
       return { status: pilot.status, sent: 0, discovered: 0 };
     }
