@@ -6,6 +6,7 @@ import { sendThroughControlPlane } from "./control-plane-send.js";
 import { evaluateOutbound } from "./deliverability.js";
 import { LEAD_STAGES } from "../core/types.js";
 import { authorizePilotSend, evaluatePilot, recordPilotSend } from "./pilot.js";
+import { createDirectMarketingPolicy, validateDirectMarketingEligibility } from "./direct-marketing-policy.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -165,7 +166,9 @@ export class EndToEndSalesPipeline {
     recipientAddress,
     sender,
     policy,
-    consent
+    consent,
+    consentEvidence,
+    directMarketingPolicy = createDirectMarketingPolicy()
   } = {}) {
     const draft = this.requireDraft(draftId);
     const recipient = { address: recipientAddress };
@@ -182,6 +185,19 @@ export class EndToEndSalesPipeline {
       policy,
       consent
     });
+
+    const directMarketing = validateDirectMarketingEligibility({
+      recipient,
+      consent,
+      consentEvidence,
+      sender,
+      messageBody: draft.body,
+      policy: directMarketingPolicy
+    });
+
+    if (!directMarketing.eligible) {
+      throw new Error("Direct marketing eligibility failed: " + directMarketing.errors.join("; "));
+    }
 
     let result;
     try {
