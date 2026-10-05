@@ -82,7 +82,7 @@ export async function runProductionConsentE2E(env = process.env) {
         location: "Resend test environment",
         email: TEST_RECIPIENT,
         website: "https://e2e-consent-test.invalid/" + Date.now(),
-        source: "controlled_test",
+        source: "manual",
         sourceUrl: "https://resend.com/",
         consentState: "unknown",
         consentEvidence: null
@@ -159,7 +159,7 @@ export async function runProductionConsentE2E(env = process.env) {
         location: "Resend test environment",
         email: TEST_RECIPIENT,
         website: "https://e2e-revoked-test.invalid/" + Date.now(),
-        source: "controlled_test",
+        source: "manual",
         sourceUrl: "https://resend.com/",
         consentState: "allowed",
         consentEvidence: {
