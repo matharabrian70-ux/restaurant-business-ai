@@ -217,7 +217,7 @@ async function fetchOverpassTile({
         throw lastError;
       }
 
-      if (attempt >= maxAttempts) {
+      if (error?.name === "AbortError" || isRetryableNetworkError(error) || attempt >= maxAttempts) {
         lastError = new Error(`${lastError.message} (endpoint: ${endpoint})`);
         break;
       }
