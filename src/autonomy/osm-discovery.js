@@ -1,10 +1,10 @@
 const DEFAULT_OVERPASS_ENDPOINT = "https://overpass.private.coffee/api/interpreter";
 const DEFAULT_BBOX = "-1.45,36.65,-1.15,37.05";
-const DEFAULT_TILE_DEGREES = 0.25;
-const DEFAULT_MAX_TILES = 64;
+const DEFAULT_TILE_DEGREES = 0.1;
+const DEFAULT_MAX_TILES = 32;
 const DEFAULT_MAX_ATTEMPTS = 4;
 const DEFAULT_RETRY_DELAY_MS = 500;
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
 const DEFAULT_MAX_RUNTIME_MS = 180_000;
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const RETRYABLE_NETWORK_CODES = new Set([
@@ -140,15 +140,18 @@ async function fetchWebsiteEmail(website, fetchImpl) {
 async function fetchOverpassTile({
   endpoint,
   tile,
+  elementType,
   perTileLimit,
   fetchImpl,
   maxAttempts,
   retryDelayMs,
   sleepImpl,
-  requestTimeoutMs
+  requestTimeoutMs,
+  deadlineAt
 }) {
   const bbox = formatBbox(tile);
-  const query = `[out:json][timeout:25];nwr["amenity"="restaurant"](${bbox});out center tags ${perTileLimit};`;
+  const output = elementType === "node" ? "out tags" : "out center tags";
+  const query = `[out:json][timeout:20];${elementType}["amenity"="restaurant"](${bbox});${output} ${perTileLimit};`;
 
   const request = {
     method: "POST",
@@ -164,8 +167,14 @@ async function fetchOverpassTile({
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let timeout;
     try {
+      if (deadlineAt && Date.now() >= deadlineAt) {
+        throw new Error("OpenStreetMap discovery max runtime reached");
+      }
+
       const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+      const remainingMs = deadlineAt ? Math.max(1_000, deadlineAt - Date.now()) : requestTimeoutMs;
+      const effectiveTimeoutMs = Math.min(requestTimeoutMs, remainingMs);
+      timeout = setTimeout(() => controller.abort(), effectiveTimeoutMs);
       const response = await fetchImpl(endpoint, {
         ...request,
         signal: controller.signal
@@ -294,7 +303,6 @@ export async function discoverFromOpenStreetMap({
     dailyTileOffset(createTiles(parsedBbox, safeTileDegrees).length, now)
   ).slice(0, safeMaxTiles);
 
-  const perTileLimit = Math.min(50, Math.max(safeLimit, 10));
   const records = [];
   const seen = new Set();
   const failures = [];
@@ -309,34 +317,58 @@ export async function discoverFromOpenStreetMap({
 
     console.log(`OSM discovery tile ${tileIndex + 1}/${tiles.length}: ${formatBbox(tile)}`);
 
-    try {
-      const data = await fetchOverpassTile({
-        endpoint,
-        tile,
-        perTileLimit,
-        fetchImpl,
-        maxAttempts: safeMaxAttempts,
-        retryDelayMs: safeRetryDelayMs,
-        sleepImpl,
-        requestTimeoutMs: safeRequestTimeoutMs
-      });
+    const tileFailures = [];
 
-      console.log(`OSM discovery tile ${tileIndex + 1}/${tiles.length} returned ${(data.elements ?? []).length} element(s)`);
-
-      for (const element of data.elements ?? []) {
-        if (records.length >= safeLimit) break;
-
-        const record = normalizeElement(element);
-        if (!record || seen.has(record.id)) continue;
-
-        seen.add(record.id);
-        records.push(record);
+    for (const elementType of ["node", "way", "relation"]) {
+      if (records.length >= safeLimit) break;
+      if (Date.now() - startedAt >= safeMaxRuntimeMs) {
+        console.log(`OSM discovery runtime limit reached during tile ${tileIndex + 1}; returning ${records.length} record(s)`);
+        break;
       }
-    } catch (error) {
-      console.warn(`OSM discovery tile ${tileIndex + 1}/${tiles.length} failed: ${error?.message || String(error)}`);
+
+      const remaining = safeLimit - records.length;
+      const perTypeLimit = Math.min(50, Math.max(1, remaining));
+
+      try {
+        const data = await fetchOverpassTile({
+          endpoint,
+          tile,
+          elementType,
+          perTileLimit: perTypeLimit,
+          fetchImpl,
+          maxAttempts: safeMaxAttempts,
+          retryDelayMs: safeRetryDelayMs,
+          sleepImpl,
+          requestTimeoutMs: safeRequestTimeoutMs,
+          deadlineAt: startedAt + safeMaxRuntimeMs
+        });
+
+        console.log(
+          `OSM discovery tile ${tileIndex + 1}/${tiles.length} ${elementType} query returned ${(data.elements ?? []).length} element(s)`
+        );
+
+        for (const element of data.elements ?? []) {
+          if (records.length >= safeLimit) break;
+
+          const record = normalizeElement(element);
+          if (!record || seen.has(record.id)) continue;
+
+          seen.add(record.id);
+          records.push(record);
+        }
+      } catch (error) {
+        const message = error?.message || String(error);
+        console.warn(
+          `OSM discovery tile ${tileIndex + 1}/${tiles.length} ${elementType} query failed: ${message}`
+        );
+        tileFailures.push(`${elementType}: ${message}`);
+      }
+    }
+
+    if (tileFailures.length) {
       failures.push({
         bbox: formatBbox(tile),
-        message: error?.message || String(error)
+        message: tileFailures.join(" | ")
       });
     }
   }
