@@ -14,9 +14,7 @@ function buildControlledTestContent(env = process.env) {
     lead,
     research: {
       name: TEST_RESTAURANT,
-      notes: [
-        "This controlled test uses the same professional outreach template that production drafts use."
-      ],
+      notes: [],
       hasOnlineOrdering: false,
       deliveryAvailable: true,
       multipleBranches: false,
