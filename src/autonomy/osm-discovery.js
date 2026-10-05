@@ -311,16 +311,17 @@ export async function discoverFromOpenStreetMap({
 
   const effectiveFallbackEndpoints =
     fallbackEndpoints == null
-      ? DEFAULT_OVERPASS_FALLBACK_ENDPOINTS.join(",")
+      ? DEFAULT_OVERPASS_FALLBACK_ENDPOINTS
       : fallbackEndpoints;
 
-  const configuredEndpoints = [
-    endpoint,
-    ...String(effectiveFallbackEndpoints)
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean)
-  ];
+  const fallbackEndpointList = Array.isArray(effectiveFallbackEndpoints)
+    ? effectiveFallbackEndpoints
+    : String(effectiveFallbackEndpoints)
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+  const configuredEndpoints = [endpoint, ...fallbackEndpointList];
   const endpoints = [...new Set(configuredEndpoints)].slice(0, 3);
 
   const parsedBbox = parseBbox(bbox);
