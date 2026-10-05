@@ -1,4 +1,5 @@
-const PILOT_PROSPECTS = [\n  {
+const PILOT_PROSPECTS = [
+  {
     id: "PILOT-01",
     name: "Pili Restaurant",
     location: "GTC Mall, Westlands",
@@ -9,7 +10,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.pilirestaurant.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-02",
     name: "Crave Kenya",
     location: "Kilimani",
@@ -20,7 +22,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://crave-kenya.quickprimetech.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-03",
     name: "Mode Café",
     location: "Kilimani",
@@ -31,7 +34,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.themodecafe.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-04",
     name: "Five Senses Restaurant",
     location: "Kilimani",
@@ -42,7 +46,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://5senses.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-05",
     name: "The Golden Stool Kitchen & Bar",
     location: "Limuru Road",
@@ -53,7 +58,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.tripadvisor.com/Restaurant_Review-g294207-d23758937-Reviews-Golden_Stool_Kitchen_And_Bar-Nairobi.html",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-06",
     name: "Mawimbi Seafood Restaurant",
     location: "Kijabe Street",
@@ -64,7 +70,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.mawimbirestaurant.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-07",
     name: "Bao Box",
     location: "Westlands",
@@ -75,7 +82,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://baobox.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-08",
     name: "Zen Garden",
     location: "Lower Kabete Road",
@@ -86,7 +94,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.zengarden.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-09",
     name: "Nairobi Street Kitchen",
     location: "Mpaka Road, Westlands",
@@ -97,7 +106,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://nairobistreetkitchen.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-10",
     name: "Open House Restaurant",
     location: "Parklands",
@@ -108,7 +118,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.tripadvisor.com/Restaurant_Review-g294207-d1898496-Reviews-Open_House_Restaurant-Nairobi.html",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-11",
     name: "Oyster Bay",
     location: "Kilimani",
@@ -119,7 +130,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.nairobirestaurants.co.ke/restaurant/oyster-bay/profile",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-12",
     name: "Seven Seafood & Grill",
     location: "ABC Place, Westlands",
@@ -130,7 +142,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.experienceseven.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-13",
     name: "La Terrazza Italian Restaurant",
     location: "Green House Mall, Ngong Road",
@@ -141,7 +154,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://laterrazzarestaurant.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-14",
     name: "Harvest Restaurant",
     location: "Village Market",
@@ -152,7 +166,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://harvestkenya.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-15",
     name: "La Casa Di Nico Ristorante",
     location: "Village Market",
@@ -163,7 +178,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.lacasadinicoristorante.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-16",
     name: "Rozina Restaurant",
     location: "Westlands",
@@ -174,7 +190,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://rozinarestaurant.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-17",
     name: "Inca Restaurant",
     location: "Lavington",
@@ -185,7 +202,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.thesocialhouse.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-18",
     name: "The Tavern",
     location: "The King Post, Rhapta Road",
@@ -196,7 +214,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://thetavern.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-19",
     name: "The Grove Restaurant",
     location: "Riverside",
@@ -207,7 +226,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.bwexecutiveresidencynairobi.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-20",
     name: "Golden Star Restaurant",
     location: "Banda Street, CBD",
@@ -218,7 +238,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.ubereats.com/ke/store/golden-star-restaurant/M3gYm9auU8ylcNjwrNAbzg",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-21",
     name: "Urban Eatery",
     location: "Waiyaki Way",
@@ -229,7 +250,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.urbaneatery.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-22",
     name: "About Thyme",
     location: "Westlands",
@@ -240,7 +262,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://about-thyme.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-23",
     name: "PRONTO Restaurant",
     location: "CBD",
@@ -251,7 +274,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://prontorestaurant.co.ke/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-24",
     name: "Wasp & Sprout",
     location: "Loresho",
@@ -262,7 +286,8 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.waspandsprout.com/",
     consentState: "unknown"
-  },\n  {
+  },
+  {
     id: "PILOT-25",
     name: "OLIVEIRA Restaurant",
     location: "Biashara Street, CBD",
@@ -273,4 +298,7 @@ const PILOT_PROSPECTS = [\n  {
     source: "approved_import",
     sourceUrl: "https://www.oliveirarestaurant.co.ke/",
     consentState: "unknown"
-  }\n];\n\nexport default Object.freeze(PILOT_PROSPECTS);\n
+  }
+];
+
+export default Object.freeze(PILOT_PROSPECTS);
