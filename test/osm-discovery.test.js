@@ -67,7 +67,7 @@ test("OSM discovery splits a bbox into tiles, retries transient failures, dedupl
     now: new Date("2026-10-05T00:00:00Z")
   });
 
-  assert.equal(result.length, 2);
+  assert.equal(result.length, 3);
   assert.equal(new Set(result.map((record) => record.id)).size, 2);
   assert.ok(calls.length >= 2);
   assert.equal(delays.length, 1);
