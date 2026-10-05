@@ -162,14 +162,14 @@ async function fetchOverpassTile({
   let lastError;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let timeout;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+      timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
       const response = await fetchImpl(endpoint, {
         ...request,
         signal: controller.signal
       });
-      clearTimeout(timeout);
 
       if (RETRYABLE_STATUSES.has(response.status)) {
         await response.body?.cancel();
@@ -186,6 +186,7 @@ async function fetchOverpassTile({
 
       return await response.json();
     } catch (error) {
+      if (timeout) clearTimeout(timeout);
       lastError = error;
 
       if (error?.name === "AbortError") {
@@ -197,8 +198,9 @@ async function fetchOverpassTile({
         RETRYABLE_STATUSES.has(error?.retryableStatus) ||
         isRetryableNetworkError(error);
 
+      if (timeout) clearTimeout(timeout);
       if (!retryable || attempt >= maxAttempts) {
-        throw error;
+        throw lastError;
       }
 
       const jitteredDelay = retryDelayMs * 2 ** (attempt - 1) * (0.5 + Math.random());
