@@ -14,6 +14,7 @@ import { runDiscoveryOnlyTest } from "./src/autonomy/discovery-test.js";
 import { PostgresAutonomyStore } from "./src/autonomy/postgres-store.js";
 import { ComplianceStore } from "./src/sales/compliance-store.js";
 import { createManualSalesRuntime } from "./src/sales/manual-batch.js";
+import { extractSenderAddress } from "./src/sales/production-email-config.js";
 
 const port = Number(process.env.PORT || 10000);
 
@@ -136,6 +137,74 @@ export function buildServer(
 
       try {
         const result = manualSalesRuntime.preparePilotBatch({ limit: 25 });
+        res.writeHead(200, {"content-type": "application/json"});
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(400, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/control/pilot/consent") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      try {
+        const body = JSON.parse(await readBody(req) || "{}");
+        const result = manualSalesRuntime.recordRecipientConsent({
+          id: body.id,
+          source: body.source,
+          at: body.at
+        });
+        res.writeHead(200, {"content-type": "application/json"});
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(400, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/control/pilot/send-eligible") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      if (env.SALES_B2B_OUTREACH_ENABLED !== "true") {
+        res.writeHead(403, {"content-type": "application/json"});
+        res.end(JSON.stringify({
+          error: "B2B direct outreach is disabled",
+          eligible: 0
+        }));
+        return;
+      }
+
+      try {
+        const result = await manualSalesRuntime.sendApprovedBatch({
+          limit: 25,
+          sender: {
+            address: extractSenderAddress(env.RESEND_FROM),
+            replyTo: env.RESEND_REPLY_TO || extractSenderAddress(env.RESEND_FROM),
+            verified: env.RESEND_DOMAIN_VERIFIED === "true"
+          }
+        });
+
         res.writeHead(200, {"content-type": "application/json"});
         res.end(JSON.stringify(result));
       } catch (error) {
