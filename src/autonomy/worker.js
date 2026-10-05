@@ -162,6 +162,7 @@ export class AutonomousWorker {
         recipientAddress: record.email,
         sender: {
           address: this.env.RESEND_FROM,
+          replyTo: this.env.RESEND_REPLY_TO || this.env.RESEND_FROM,
           verified: true
         },
         policy: {
