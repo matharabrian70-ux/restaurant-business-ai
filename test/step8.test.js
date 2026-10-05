@@ -42,3 +42,27 @@ test("factory requires credentials when Resend is enabled", () => {
     /RESEND_API_KEY/
   );
 });
+
+test("Resend transport includes the configured reply-to address", async () => {
+  let request;
+  const transport = new ResendTransport({
+    apiKey: "re_test",
+    from: "Sales <sales@example.com>",
+    replyTo: "hello@example.com",
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return { ok: true, status: 200, json: async () => ({ id: "resend-replyto-test" }) };
+    }
+  });
+
+  await transport.send({
+    recipient: "restaurant@example.com",
+    subject: "Website",
+    body: "Hello. Reply STOP to opt out.",
+    leadId: "L2",
+    outreachId: "O2"
+  });
+
+  const payload = JSON.parse(request.options.body);
+  assert.equal(payload.reply_to, "hello@example.com");
+});
