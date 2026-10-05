@@ -1,4 +1,5 @@
 import pg from "pg";
+import { ConsentLedger } from "./consent-ledger.js";
 
 const { Pool } = pg;
 
@@ -10,6 +11,7 @@ export class PostgresAutonomyStore {
       ssl: ssl ? { rejectUnauthorized: false } : undefined,
       max: 3
     });
+    this.consent = new ConsentLedger(this.pool);
   }
 
   async init() {
@@ -38,6 +40,7 @@ export class PostgresAutonomyStore {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await this.consent.init();
   }
 
   async get(key, fallback = null) {
@@ -107,6 +110,18 @@ export class PostgresAutonomyStore {
       [eventId, eventType, JSON.stringify(payload)]
     );
     return result.rowCount === 1;
+  }
+
+  async getConsentByEmail(email) {
+    return this.consent.getByEmail(email);
+  }
+
+  async recordConsent({ email, source, at, method } = {}) {
+    return this.consent.recordAllowed({ email, source, at, method });
+  }
+
+  async revokeConsent({ email, source, at, method } = {}) {
+    return this.consent.revoke({ email, source, at, method });
   }
 
   async close() {
