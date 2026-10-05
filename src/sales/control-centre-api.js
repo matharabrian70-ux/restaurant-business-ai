@@ -189,6 +189,28 @@ export function createControlCentreApi({
       return true;
     }
 
+    if (
+      req.method === "POST" &&
+      req.url === "/control/approvals/approve-all"
+    ) {
+      try {
+        const body = await parseJsonBody(req);
+        const result = controlPlane.approveAllPendingOutreach({
+          limit: Number.isInteger(body.limit) ? body.limit : 25,
+          reason:
+            typeof body.reason === "string"
+              ? body.reason.slice(0, 500)
+              : "Human operator approved the current outreach batch"
+        });
+
+        json(res, 200, result);
+      } catch (error) {
+        json(res, 400, { error: error.message });
+      }
+
+      return true;
+    }
+
     const approvalMatch =
       req.url.match(
         /^\/control\/approvals\/([^/]+)\/decide$/
