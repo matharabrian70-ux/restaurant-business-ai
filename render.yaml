@@ -45,9 +45,9 @@ services:
       - key: AUTONOMOUS_DISCOVERY_QUERIES
         value: "restaurant"
       - key: AUTONOMOUS_DISCOVERY_PAGE_SIZE
-        value: "20"
+        value: "35"
       - key: AUTONOMOUS_DISCOVERY_DAILY_TARGET
-        value: "20"
+        value: "35"
       - key: AUTONOMOUS_SALES_ENABLED
         value: "false"
       - key: AUTONOMOUS_DAILY_LIMIT
@@ -67,7 +67,7 @@ services:
     plan: 0.5c-512mb
     buildCommand: npm install
     startCommand: node autonomous-worker.js
-    schedule: "17 * * * *"
+    schedule: "17 7 * * *"
     envVars:
       - key: DATABASE_URL
         sync: false
