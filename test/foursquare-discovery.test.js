@@ -74,7 +74,7 @@ test("Foursquare discovery normalizes, deduplicates, and enriches restaurant lea
   );
 
   assert.match(request.url, /query=restaurant/);
-  assert.match(request.url, /near=Nairobi%2C%20Kenya/);
+  assert.equal(new URL(request.url).searchParams.get("near"), "Nairobi, Kenya");
   assert.equal(request.options.headers.authorization, "Bearer test-key");
   assert.equal(request.options.headers["X-Places-Api-Version"], "2025-06-17");
 });
