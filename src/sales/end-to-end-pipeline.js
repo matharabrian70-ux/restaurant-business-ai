@@ -207,6 +207,7 @@ export class EndToEndSalesPipeline {
         recipient,
         policy,
         transport: this.transport,
+        replyTo: sender.replyTo,
         actor: "agent"
       });
     } catch (error) {
