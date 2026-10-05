@@ -47,6 +47,39 @@ test("Resend transport retries transient network failures and then succeeds", as
   assert.deepEqual(delays, [500, 1000]);
 });
 
+test("Resend transport retries AggregateError network failures from Node fetch", async () => {
+  let attempts = 0;
+
+  const transport = new ResendTransport({
+    apiKey: "test-key",
+    from: "sender@example.com",
+    fetchImpl: async () => {
+      attempts++;
+      if (attempts === 1) {
+        const ipv4 = new Error("connection refused");
+        ipv4.code = "ECONNREFUSED";
+        const ipv6 = new Error("network unreachable");
+        ipv6.code = "ENETUNREACH";
+        throw Object.assign(new TypeError("fetch failed"), {
+          cause: new AggregateError([ipv4, ipv6], "connect failed")
+        });
+      }
+      return response({ data: { id: "msg-aggregate" } });
+    },
+    sleepImpl: async () => {}
+  });
+
+  const result = await transport.send({
+    recipient: "customer@example.com",
+    subject: "Test",
+    body: "Hello",
+    idempotencyKey: "outreach-aggregate"
+  });
+
+  assert.equal(result.messageId, "msg-aggregate");
+  assert.equal(attempts, 2);
+});
+
 test("Resend transport retries fetch failures exposed through error.cause", async () => {
   let attempts = 0;
 
