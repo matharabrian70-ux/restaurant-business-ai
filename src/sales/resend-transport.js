@@ -1,28 +1,73 @@
 import { Transport } from "./transport.js";
 
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_RETRY_DELAY_MS = 500;
+const RETRYABLE_NETWORK_CODES = new Set([
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ENETUNREACH",
+  "EHOSTUNREACH",
+  "ETIMEDOUT",
+  "EAI_AGAIN",
+  "ENOTFOUND"
+]);
+
+function getNetworkErrorCode(error) {
+  return error?.code ?? error?.cause?.code ?? null;
+}
+
+function isRetryableNetworkError(error) {
+  return RETRYABLE_NETWORK_CODES.has(getNetworkErrorCode(error));
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class ResendTransport extends Transport {
-  constructor({ apiKey, from, replyTo, fetchImpl = globalThis.fetch, apiBase = "https://api.resend.com" } = {}) {
+  constructor({
+    apiKey,
+    from,
+    replyTo,
+    fetchImpl = globalThis.fetch,
+    apiBase = "https://api.resend.com",
+    maxAttempts = DEFAULT_MAX_ATTEMPTS,
+    retryDelayMs = DEFAULT_RETRY_DELAY_MS,
+    sleepImpl = sleep
+  } = {}) {
     super("resend");
     if (!apiKey) throw new Error("RESEND_API_KEY is required");
     if (!from) throw new Error("RESEND_FROM is required");
     if (typeof fetchImpl !== "function") throw new Error("fetch implementation is required");
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+      throw new Error("maxAttempts must be a positive integer");
+    }
+    if (!Number.isFinite(retryDelayMs) || retryDelayMs < 0) {
+      throw new Error("retryDelayMs must be a non-negative number");
+    }
+    if (typeof sleepImpl !== "function") throw new Error("sleep implementation is required");
+
     this.apiKey = apiKey;
     this.from = from;
     this.replyTo = replyTo || from;
     this.fetchImpl = fetchImpl;
     this.apiBase = apiBase.replace(/\/$/, "");
     this.provider = "resend";
+    this.maxAttempts = maxAttempts;
+    this.retryDelayMs = retryDelayMs;
+    this.sleepImpl = sleepImpl;
   }
 
   async send({ recipient, subject, body, leadId, outreachId, idempotencyKey, replyTo }) {
     if (!recipient || !body) throw new Error("recipient and body are required");
+
     const headers = {
       "Authorization": "Bearer " + this.apiKey,
       "Content-Type": "application/json"
     };
     if (idempotencyKey) headers["Idempotency-Key"] = String(idempotencyKey);
 
-    const response = await this.fetchImpl(this.apiBase + "/emails", {
+    const request = {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -31,14 +76,37 @@ export class ResendTransport extends Transport {
         subject: subject || "",
         text: body,
         ...(replyTo || this.replyTo ? { reply_to: replyTo || this.replyTo } : {}),
-        headers: { "X-Lead-ID": String(leadId || ""), "X-Outreach-ID": String(outreachId || "") }
+        headers: {
+          "X-Lead-ID": String(leadId || ""),
+          "X-Outreach-ID": String(outreachId || "")
+        }
       })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = data?.message || data?.error || ("Resend request failed with HTTP " + response.status);
-      throw new Error(message);
+    };
+
+    let lastError;
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
+      try {
+        const response = await this.fetchImpl(this.apiBase + "/emails", request);
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const message = data?.message || data?.error || ("Resend request failed with HTTP " + response.status);
+          throw new Error(message);
+        }
+
+        return { status: "sent", provider: "resend", messageId: data.id };
+      } catch (error) {
+        lastError = error;
+
+        // Retry only connection-level failures. HTTP/API errors are surfaced immediately.
+        if (!isRetryableNetworkError(error) || attempt >= this.maxAttempts) {
+          throw error;
+        }
+
+        await this.sleepImpl(this.retryDelayMs * 2 ** (attempt - 1));
+      }
     }
-    return { status: "sent", provider: "resend", messageId: data.id };
+
+    throw lastError;
   }
 }
