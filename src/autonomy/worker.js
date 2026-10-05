@@ -5,6 +5,7 @@ import { createSuppressionStore } from "../sales/compliance.js";
 import { discoverFromConfiguredSource } from "./discovery-provider.js";
 import { PostgresAutonomyStore } from "./postgres-store.js";
 import { createHandoff, classifyReply } from "./handover.js";
+import { createDirectMarketingPolicy, validateDirectMarketingEligibility } from "../sales/direct-marketing-policy.js";
 
 const DEMO_URL = "https://matharabrian70-ux.github.io/Restaurant-Website-Prototype/";
 
@@ -19,13 +20,15 @@ export class AutonomousWorker {
     store,
     transport,
     fetchImpl = globalThis.fetch,
-    notify
+    notify,
+    discover = discoverFromConfiguredSource
   } = {}) {
     this.env = env;
     this.store = store ?? new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
     this.transport = transport;
     this.fetchImpl = fetchImpl;
     this.notify = notify;
+    this.discover = discover;
   }
 
   async init() {
@@ -48,7 +51,7 @@ export class AutonomousWorker {
       return { status: pilot.status, sent: 0, discovered: 0 };
     }
 
-    const records = await discoverFromConfiguredSource({ env: this.env, fetchImpl: this.fetchImpl });
+    const records = await this.discover({ env: this.env, fetchImpl: this.fetchImpl });
 
     const controlPlane = new SalesControlPlane();
     const pipeline = new EndToEndSalesPipeline({
@@ -82,7 +85,8 @@ export class AutonomousWorker {
       const enriched = {
         ...record,
         id: record.id,
-        consentState: this.env.AUTONOMOUS_REQUIRE_CONSENT === "true" ? "unknown" : "allowed"
+        consentState: record.consentState ?? "unknown",
+        consentEvidence: record.consentEvidence ?? null
       };
 
       const added = pipeline.addProspect(enriched, {
@@ -97,6 +101,29 @@ export class AutonomousWorker {
       });
 
       const prepared = pipeline.prepareOutreach(added.lead.id, "email");
+
+      const directMarketingPolicy = createDirectMarketingPolicy();
+      const eligibility = validateDirectMarketingEligibility({
+        recipient: { address: record.email },
+        consent: enriched.consentState,
+        consentEvidence: enriched.consentEvidence,
+        sender: {
+          address: this.env.RESEND_FROM,
+          replyTo: this.env.RESEND_REPLY_TO || this.env.RESEND_FROM
+        },
+        messageBody: prepared.draft.body,
+        policy: directMarketingPolicy
+      });
+
+      if (!eligibility.eligible) {
+        controlPlane.cancelOutreachApproval(prepared.draft.id, {
+          actor: "agent",
+          reason: "Autonomous outreach skipped: " + eligibility.errors.join("; ")
+        });
+        skipped++;
+        continue;
+      }
+
       pipeline.authorizeAutonomousOutreach(prepared.draft.id, {
         reason: "Autonomous sales policy"
       });
@@ -114,7 +141,9 @@ export class AutonomousWorker {
           requireUnsubscribeMechanism: true,
           hasUnsubscribeMechanism: true
         },
-        consent: enriched.consentState
+        consent: enriched.consentState,
+        consentEvidence: enriched.consentEvidence,
+        directMarketingPolicy
       });
 
       await this.store.upsertLead({
