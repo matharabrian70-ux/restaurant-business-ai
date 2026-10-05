@@ -1,0 +1,22 @@
+name: Autonomous Worker
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-autonomous-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger autonomous worker
+        env:
+          AUTONOMY_URL: ${{ secrets.AUTONOMY_URL }}
+          AUTONOMY_CONTROL_TOKEN: ${{ secrets.AUTONOMY_CONTROL_TOKEN }}
+        run: |
+          test -n "$AUTONOMY_URL"
+          test -n "$AUTONOMY_CONTROL_TOKEN"
+          curl --fail-with-body --silent --show-error \
+            -X POST "$AUTONOMY_URL/autonomy/run" \
+            -H "Authorization: Bearer $AUTONOMY_CONTROL_TOKEN" \
+            -H "Content-Type: application/json"

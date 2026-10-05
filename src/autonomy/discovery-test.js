@@ -1,4 +1,4 @@
-import { discoverFromGooglePlaces } from "./google-places-discovery.js";
+import { discoverFromConfiguredSource } from "./discovery-provider.js";
 
 function identityFor(record) {
   if (record.website) {
@@ -16,13 +16,7 @@ export async function runDiscoveryOnlyTest({
   if (!store) throw new Error("store is required for discovery-only test");
   await store.init();
 
-  const records = await discoverFromGooglePlaces({
-    apiKey: env.GOOGLE_PLACES_API_KEY,
-    queries: String(env.AUTONOMOUS_DISCOVERY_QUERIES || "restaurants in Nairobi, Kenya")
-      .split("|").map((q) => q.trim()).filter(Boolean),
-    maxPerQuery: Number(env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
-    fetchImpl
-  });
+  const records = await discoverFromConfiguredSource({ env, fetchImpl });
 
   let stored = 0;
   let updated = 0;

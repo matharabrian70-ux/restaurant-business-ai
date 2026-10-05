@@ -2,7 +2,7 @@ import { createPilot, authorizePilotSend, recordPilotSend, evaluatePilot, PILOT_
 import { EndToEndSalesPipeline } from "../sales/end-to-end-pipeline.js";
 import { SalesControlPlane } from "../sales/control-plane.js";
 import { createSuppressionStore } from "../sales/compliance.js";
-import { discoverFromGooglePlaces } from "./google-places-discovery.js";
+import { discoverFromConfiguredSource } from "./discovery-provider.js";
 import { PostgresAutonomyStore } from "./postgres-store.js";
 import { createHandoff, classifyReply } from "./handover.js";
 
@@ -48,13 +48,7 @@ export class AutonomousWorker {
       return { status: pilot.status, sent: 0, discovered: 0 };
     }
 
-    const records = await discoverFromGooglePlaces({
-      apiKey: this.env.GOOGLE_PLACES_API_KEY,
-      queries: String(this.env.AUTONOMOUS_DISCOVERY_QUERIES || "restaurants in Nairobi, Kenya")
-        .split("|").map((q) => q.trim()).filter(Boolean),
-      maxPerQuery: Number(this.env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
-      fetchImpl: this.fetchImpl
-    });
+    const records = await discoverFromConfiguredSource({ env: this.env, fetchImpl: this.fetchImpl });
 
     const controlPlane = new SalesControlPlane();
     const pipeline = new EndToEndSalesPipeline({
