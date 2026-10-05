@@ -116,7 +116,7 @@ test("OSM discovery aborts a hung Overpass request and retries it", async () => 
       maxResults: 1,
       tileDegrees: 0.1,
       maxAttempts: 2,
-      requestTimeoutMs: 1000,
+      requestTimeoutMs: 5000,
       fetchImpl: async (_url, options) => {
         attempts += 1;
         await new Promise((_, reject) => {
@@ -131,7 +131,7 @@ test("OSM discovery aborts a hung Overpass request and retries it", async () => 
         delays.push(delay);
       }
     }),
-    /timed out after 1000ms/
+    /timed out after 5000ms/
   );
 
   assert.equal(attempts, 2);
