@@ -1,4 +1,4 @@
-const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
+const DEFAULT_OVERPASS_ENDPOINT = "https://overpass.private.coffee/api/interpreter";
 const DEFAULT_BBOX = "-1.45,36.65,-1.15,37.05";
 
 function normalizeEmail(value) {
@@ -41,12 +41,13 @@ async function fetchWebsiteEmail(website, fetchImpl) {
 export async function discoverFromOpenStreetMap({
   bbox = process.env.AUTONOMOUS_DISCOVERY_BBOX || DEFAULT_BBOX,
   maxResults = Number(process.env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
+  endpoint = process.env.AUTONOMOUS_OVERPASS_ENDPOINT || DEFAULT_OVERPASS_ENDPOINT,
   fetchImpl = globalThis.fetch
 } = {}) {
   const safeLimit = Math.min(50, Math.max(1, Number(maxResults) || 20));
   const query = `[out:json][timeout:25];nwr["amenity"="restaurant"](${bbox});out center tags;`;
 
-  const response = await fetchImpl(OVERPASS_ENDPOINT, {
+  const response = await fetchImpl(endpoint, {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
