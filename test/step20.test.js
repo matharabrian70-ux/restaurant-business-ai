@@ -30,7 +30,11 @@ test("autonomous runner is disabled by default", async () => {
 
   const runner = new AutonomousSalesRunner({
     pipeline,
-    sender: { address: "sales@example.com", verified: true },
+    sender: {
+      address: "sales@example.com",
+      replyTo: "sales@example.com",
+      verified: true
+    },
     enabled: false
   });
 
@@ -53,7 +57,11 @@ test("autonomous authorization creates a policy approval", async () => {
     pilot: createPilot({ enabled: true, stageSize: 50, dailyLimit: 2 }),
     enabled: true,
     requireConsent: false,
-    sender: { address: "sales@example.com", verified: true }
+    sender: {
+      address: "sales@example.com",
+      replyTo: "sales@example.com",
+      verified: true
+    }
   });
 
   const result = await runner.run([
@@ -64,7 +72,11 @@ test("autonomous authorization creates a policy approval", async () => {
       source: "manual",
       email: "owner@example.com",
       consentState: "allowed",
-      website: "https://example.com"
+      website: "https://example.com",
+      consentEvidence: {
+        source: "test fixture: prior inbound demo request",
+        at: "2026-10-04T00:00:00.000Z"
+      }
     }
   ]);
 
@@ -89,7 +101,11 @@ test("autonomous runner respects pilot daily limit", async () => {
     pilot: createPilot({ enabled: true, stageSize: 50, dailyLimit: 1 }),
     enabled: true,
     requireConsent: false,
-    sender: { address: "sales@example.com", verified: true }
+    sender: {
+      address: "sales@example.com",
+      replyTo: "sales@example.com",
+      verified: true
+    }
   });
 
   const result = await runner.run([
@@ -99,7 +115,11 @@ test("autonomous runner respects pilot daily limit", async () => {
       location: "Nairobi",
       source: "manual",
       email: "first@example.com",
-      consentState: "allowed"
+      consentState: "allowed",
+      consentEvidence: {
+        source: "test fixture: prior inbound demo request",
+        at: "2026-10-04T00:00:00.000Z"
+      }
     },
     {
       id: "REST-AUTO-3",
@@ -107,7 +127,11 @@ test("autonomous runner respects pilot daily limit", async () => {
       location: "Nairobi",
       source: "manual",
       email: "second@example.com",
-      consentState: "allowed"
+      consentState: "allowed",
+      consentEvidence: {
+        source: "test fixture: prior inbound demo request",
+        at: "2026-10-04T00:00:00.000Z"
+      }
     }
   ]);
 
