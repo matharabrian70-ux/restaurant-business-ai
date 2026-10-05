@@ -194,15 +194,6 @@ function buildHtmlEmail({ restaurantName, research = {} }) {
               </a>
             </div>
           </div>
-            <a href="${escapeHtml(customerCheckoutUrl)}"
-               style="display:inline-block;background:#ffffff;color:#168a4a;text-decoration:none;font-weight:700;padding:10px 17px;border:1px solid #168a4a;border-radius:999px;margin:0 0 8px 0;">
-              This is the Checkout System →
-            </a>
-          </div>
-          <a href="${escapeHtml(prototypeUrl)}"
-             style="display:inline-block;color:#168a4a;text-decoration:none;font-weight:700;padding:4px 0;">
-            This is the Website Prototype →
-          </a>
         </div>
         ${closingHtml}
       </div>
