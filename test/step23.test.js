@@ -28,7 +28,9 @@ test("OpenStreetMap discovery returns public restaurant records without an API k
   const records = await discoverFromOpenStreetMap({
     fetchImpl,
     maxResults: 20,
-    bbox: "-1.4,36.7,-1.2,36.9"
+    bbox: "-1.4,36.7,-1.2,36.9",
+    endpoint: "https://overpass-api.de/api/interpreter",
+    fallbackEndpoints: ""
   });
 
   assert.equal(records.length, 1);
@@ -47,7 +49,7 @@ test("configured discovery defaults to OpenStreetMap and needs no Google key", a
   }), { status: 200, headers: { "content-type": "application/json" } });
 
   const records = await discoverFromConfiguredSource({
-    env: { AUTONOMOUS_DISCOVERY_PROVIDER: "osm", AUTONOMOUS_DISCOVERY_PAGE_SIZE: "5" },
+    env: { AUTONOMOUS_DISCOVERY_PROVIDER: "osm", AUTONOMOUS_DISCOVERY_PAGE_SIZE: "5", AUTONOMOUS_OVERPASS_ENDPOINT: "https://overpass-api.de/api/interpreter", AUTONOMOUS_OVERPASS_FALLBACK_ENDPOINTS: "" },
     fetchImpl
   });
 
