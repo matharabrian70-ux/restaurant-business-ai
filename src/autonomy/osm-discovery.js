@@ -4,6 +4,8 @@ const DEFAULT_TILE_DEGREES = 0.25;
 const DEFAULT_MAX_TILES = 64;
 const DEFAULT_MAX_ATTEMPTS = 4;
 const DEFAULT_RETRY_DELAY_MS = 500;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_RUNTIME_MS = 180_000;
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const RETRYABLE_NETWORK_CODES = new Set([
   "ECONNRESET",
@@ -142,7 +144,8 @@ async function fetchOverpassTile({
   fetchImpl,
   maxAttempts,
   retryDelayMs,
-  sleepImpl
+  sleepImpl,
+  requestTimeoutMs
 }) {
   const bbox = formatBbox(tile);
   const query = `[out:json][timeout:25];nwr["amenity"="restaurant"](${bbox});out center tags ${perTileLimit};`;
@@ -160,7 +163,13 @@ async function fetchOverpassTile({
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const response = await fetchImpl(endpoint, request);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+      const response = await fetchImpl(endpoint, {
+        ...request,
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
 
       if (RETRYABLE_STATUSES.has(response.status)) {
         await response.body?.cancel();
@@ -178,6 +187,11 @@ async function fetchOverpassTile({
       return await response.json();
     } catch (error) {
       lastError = error;
+
+      if (error?.name === "AbortError") {
+        lastError = new Error(`OpenStreetMap discovery request timed out after ${requestTimeoutMs}ms`);
+        lastError.retryableStatus = 504;
+      }
 
       const retryable =
         RETRYABLE_STATUSES.has(error?.retryableStatus) ||
@@ -257,6 +271,8 @@ export async function discoverFromOpenStreetMap({
   maxTiles = Number(process.env.AUTONOMOUS_DISCOVERY_MAX_TILES || DEFAULT_MAX_TILES),
   maxAttempts = Number(process.env.AUTONOMOUS_DISCOVERY_MAX_ATTEMPTS || DEFAULT_MAX_ATTEMPTS),
   retryDelayMs = Number(process.env.AUTONOMOUS_DISCOVERY_RETRY_DELAY_MS || DEFAULT_RETRY_DELAY_MS),
+  requestTimeoutMs = Number(process.env.AUTONOMOUS_DISCOVERY_REQUEST_TIMEOUT_MS || DEFAULT_REQUEST_TIMEOUT_MS),
+  maxRuntimeMs = Number(process.env.AUTONOMOUS_DISCOVERY_MAX_RUNTIME_MS || DEFAULT_MAX_RUNTIME_MS),
   fetchImpl = globalThis.fetch,
   sleepImpl = sleep,
   now = new Date()
@@ -266,6 +282,9 @@ export async function discoverFromOpenStreetMap({
   const safeMaxTiles = Math.min(256, Math.max(1, Number(maxTiles) || DEFAULT_MAX_TILES));
   const safeMaxAttempts = Math.min(6, Math.max(1, Number(maxAttempts) || DEFAULT_MAX_ATTEMPTS));
   const safeRetryDelayMs = Math.min(30_000, Math.max(100, Number(retryDelayMs) || DEFAULT_RETRY_DELAY_MS));
+  const safeRequestTimeoutMs = Math.min(120_000, Math.max(5_000, Number(requestTimeoutMs) || DEFAULT_REQUEST_TIMEOUT_MS));
+  const safeMaxRuntimeMs = Math.min(600_000, Math.max(30_000, Number(maxRuntimeMs) || DEFAULT_MAX_RUNTIME_MS));
+  const startedAt = Date.now();
 
   const parsedBbox = parseBbox(bbox);
   const tiles = rotateTiles(
@@ -278,8 +297,15 @@ export async function discoverFromOpenStreetMap({
   const seen = new Set();
   const failures = [];
 
-  for (const tile of tiles) {
+  for (let tileIndex = 0; tileIndex < tiles.length; tileIndex++) {
+    const tile = tiles[tileIndex];
     if (records.length >= safeLimit) break;
+    if (Date.now() - startedAt >= safeMaxRuntimeMs) {
+      console.log(`OSM discovery runtime limit reached after ${tileIndex} tile(s); returning ${records.length} record(s)`);
+      break;
+    }
+
+    console.log(`OSM discovery tile ${tileIndex + 1}/${tiles.length}: ${formatBbox(tile)}`);
 
     try {
       const data = await fetchOverpassTile({
@@ -292,6 +318,8 @@ export async function discoverFromOpenStreetMap({
         sleepImpl
       });
 
+      console.log(`OSM discovery tile ${tileIndex + 1}/${tiles.length} returned ${(data.elements ?? []).length} element(s)`);
+
       for (const element of data.elements ?? []) {
         if (records.length >= safeLimit) break;
 
@@ -302,12 +330,15 @@ export async function discoverFromOpenStreetMap({
         records.push(record);
       }
     } catch (error) {
+      console.warn(`OSM discovery tile ${tileIndex + 1}/${tiles.length} failed: ${error?.message || String(error)}`);
       failures.push({
         bbox: formatBbox(tile),
         message: error?.message || String(error)
       });
     }
   }
+
+  console.log(`OSM discovery collected ${records.length} unique restaurant(s) across ${tiles.length} tile(s); ${failures.length} tile(s) failed`);
 
   if (!records.length && failures.length) {
     throw new Error(
