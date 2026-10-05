@@ -40,6 +40,7 @@ export class PostgresAutonomyStore {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await this.consent.init();
   }
 
   async get(key, fallback = null) {
