@@ -11,6 +11,8 @@ function createStore(initialPilot = null) {
     async get(key) { return values.get(key) ?? null; },
     async set(key, value) { values.set(key, value); },
     async getLead() { return null; },
+    async getConsentByEmail() { return null; },
+    async revokeConsent() {},
     async upsertLead() { throw new Error("ineligible lead must not be persisted as contacted"); },
     async recordEvent() { throw new Error("ineligible lead must not record a sent event"); },
     async close() {}
