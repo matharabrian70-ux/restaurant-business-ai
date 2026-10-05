@@ -100,11 +100,22 @@ export class AutonomousWorker {
         continue;
       }
 
+      // Public-directory discovery never supplies marketing consent. A durable
+      // consent ledger is the only additional source that can upgrade a record
+      // to allowed, and its evidence is carried through to the send gate.
+      const recordedConsent = await this.store.getConsentByEmail(record.email);
       const enriched = {
         ...record,
         id: record.id,
-        consentState: record.consentState ?? "unknown",
-        consentEvidence: record.consentEvidence ?? null
+        consentState: recordedConsent?.state ?? record.consentState ?? "unknown",
+        consentEvidence: recordedConsent
+          ? {
+              source: recordedConsent.source,
+              at: recordedConsent.consented_at,
+              method: recordedConsent.method,
+              evidenceRef: recordedConsent.evidence_ref
+            }
+          : (record.consentEvidence ?? null)
       };
 
       const added = pipeline.addProspect(enriched, {
@@ -143,7 +154,7 @@ export class AutonomousWorker {
       }
 
       pipeline.authorizeAutonomousOutreach(prepared.draft.id, {
-        reason: "Autonomous sales policy"
+        reason: "Autonomous sales policy with recorded consent"
       });
 
       const result = await pipeline.sendApprovedOutreach({
@@ -227,6 +238,12 @@ export class AutonomousWorker {
         payload: { ...lead.payload, suppression: "unsubscribed" },
         lastOutreachAt: lead.last_outreach_at,
         handoffAt: lead.handoff_at
+      });
+      await this.store.revokeConsent({
+        email: sender,
+        source: "recipient negative reply",
+        at: new Date().toISOString(),
+        method: "reply_classification"
       });
       return { matched: true, classification: classification.classification, handoff: false };
     }
