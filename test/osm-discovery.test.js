@@ -68,7 +68,7 @@ test("OSM discovery splits a bbox into tiles, retries transient failures, dedupl
   });
 
   assert.equal(result.length, 3);
-  assert.equal(new Set(result.map((record) => record.id)).size, 2);
+  assert.equal(new Set(result.map((record) => record.id)).size, 3);
   assert.ok(calls.length >= 2);
   assert.equal(delays.length, 1);
   assert.equal(result[0].signals.publicBusinessContact, true);
