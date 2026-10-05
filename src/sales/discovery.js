@@ -11,7 +11,7 @@ export const DISCOVERY_SOURCES = Object.freeze({
 
 const ALLOWED_FIELDS = new Set([
   "id","name","businessType","location","address","phone","email",
-  "website","source","sourceUrl","sourceRef","discoveredAt","signals","notes","consentState"
+  "website","source","sourceUrl","sourceRef","discoveredAt","signals","notes","consentState","consentEvidence"
 ]);
 
 function cleanString(value) {
