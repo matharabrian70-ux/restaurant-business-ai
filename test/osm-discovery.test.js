@@ -104,3 +104,36 @@ test("OSM discovery isolates website enrichment failures", async () => {
   assert.equal(result[0].name, "Restaurant With Website");
   assert.equal(result[0].signals.publicBusinessContact, false);
 });
+
+
+test("OSM discovery aborts a hung Overpass request and retries it", async () => {
+  let attempts = 0;
+  const delays = [];
+
+  await assert.rejects(
+    discoverFromOpenStreetMap({
+      bbox: "0,0,0.1,0.1",
+      maxResults: 1,
+      tileDegrees: 0.1,
+      maxAttempts: 2,
+      requestTimeoutMs: 1000,
+      fetchImpl: async (_url, options) => {
+        attempts += 1;
+        await new Promise((_, reject) => {
+          options.signal.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          }, { once: true });
+        });
+      },
+      sleepImpl: async (delay) => {
+        delays.push(delay);
+      }
+    }),
+    /timed out after 1000ms/
+  );
+
+  assert.equal(attempts, 2);
+  assert.equal(delays.length, 1);
+});
