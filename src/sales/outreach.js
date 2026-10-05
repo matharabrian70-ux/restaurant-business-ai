@@ -3,8 +3,25 @@ const CHANNELS = Object.freeze(["email", "whatsapp", "sms", "manual"]);
 const PROTOTYPE_URL =
   "https://matharabrian70-ux.github.io/Restaurant-Website-Prototype/";
 
+const PROTOTYPE_ATTACHMENT_URL =
+  "https://github.com/matharabrian70-ux/Restaurant-Website-Prototype/archive/refs/heads/main.zip";
+
+const PROTOTYPE_ATTACHMENT = Object.freeze({
+  path: PROTOTYPE_ATTACHMENT_URL,
+  filename: "Restaurant-Website-Prototype.zip"
+});
+
 function clean(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function escapeHtml(value) {
+  return clean(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function researchSignals(research = {}) {
@@ -31,7 +48,7 @@ function researchSignals(research = {}) {
   };
 }
 
-function buildEmail({ restaurantName, research = {} }) {
+function buildMessageParts({ restaurantName, research = {} }) {
   const signals = researchSignals(research);
   const firstNote = clean(signals.notes[0]);
   const secondNote = clean(signals.notes[1]);
@@ -59,32 +76,86 @@ function buildEmail({ restaurantName, research = {} }) {
     ? `Another detail I noticed: ${secondNote}`
     : "";
 
-  return [
+  const paragraphs = [
     `Hello ${restaurantName} team,`,
-    "",
     opening,
-    "",
     solutionByAngle[signals.angle],
-    "",
     branchLine,
-    "",
     proof,
-    proof ? "" : null,
-    "I have put together a working restaurant prototype so you can see the kind of customer experience I mean rather than having to imagine it from a sales description:",
-    PROTOTYPE_URL,
-    "",
+    "I have put together a working restaurant prototype so you can see the kind of customer experience I mean rather than having to imagine it from a sales description.",
     "The important part is that this is not just a restaurant website. The goal is to give the restaurant an owned digital ordering and operations layer that can be branded around your business and adapted to how your team actually works.",
-    "",
     "If this looks relevant, I would be happy to show you the system and discuss what I would change specifically for your restaurant. There is no obligation to proceed.",
-    "",
     "If you are not the person who handles this, I would appreciate it if you could point me to the manager or person responsible for digital operations.",
-    "",
     "If you would rather not receive messages from me, just reply STOP and I will not follow up.",
-    "",
     "Regards,",
     "Brian Mathara",
     "Mathara Digital"
-  ].filter((line) => line !== null).join("\\n");
+  ].filter(Boolean);
+
+  return {
+    paragraphs,
+    prototypeUrl: PROTOTYPE_URL,
+    prototypeAttachment: PROTOTYPE_ATTACHMENT
+  };
+}
+
+function buildEmail({ restaurantName, research = {} }) {
+  const { paragraphs, prototypeUrl } = buildMessageParts({ restaurantName, research });
+  return [
+    paragraphs[0],
+    "",
+    ...paragraphs.slice(1, 4).flatMap((paragraph) => [paragraph, ""]),
+    "Prototype:",
+    prototypeUrl,
+    "",
+    ...paragraphs.slice(5).flatMap((paragraph) => [paragraph, ""])
+  ].join("\n").trim();
+}
+
+function buildHtmlEmail({ restaurantName, research = {} }) {
+  const { paragraphs, prototypeUrl } = buildMessageParts({ restaurantName, research });
+  const [greeting, ...rest] = paragraphs;
+  const closingIndex = rest.findIndex((paragraph) => paragraph === "Regards,");
+  const bodyParagraphs = closingIndex >= 0 ? rest.slice(0, closingIndex) : rest;
+  const closing = closingIndex >= 0 ? rest.slice(closingIndex) : [];
+
+  const bodyHtml = bodyParagraphs
+    .map((paragraph) => `<p style="margin:0 0 18px;">${escapeHtml(paragraph)}</p>`)
+    .join("");
+
+  const closingHtml = closing
+    .map((paragraph) => `<p style="margin:0 0 6px;">${escapeHtml(paragraph)}</p>`)
+    .join("");
+
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+    <div style="max-width:680px;margin:0 auto;padding:28px 16px;">
+      <div style="background:#ffffff;border:1px solid #e3e7ed;border-radius:14px;padding:34px;box-shadow:0 2px 8px rgba(20,30,50,.05);">
+        <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4b6b8a;margin-bottom:22px;">
+          Mathara Digital
+        </div>
+        <h1 style="font-size:24px;line-height:1.25;margin:0 0 24px;color:#111827;">
+          A digital ordering idea for ${escapeHtml(restaurantName)}
+        </h1>
+        <p style="margin:0 0 22px;">${escapeHtml(greeting)}</p>
+        ${bodyHtml}
+        <div style="margin:8px 0 28px;padding:20px;background:#f7faf8;border:1px solid #dce9df;border-radius:12px;">
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#172033;">See the working prototype</div>
+          <div style="font-size:14px;line-height:1.5;color:#5b6575;margin-bottom:16px;">
+            Open the live prototype or use the attached prototype package to explore it locally.
+          </div>
+          <a href="${escapeHtml(prototypeUrl)}"
+             style="display:inline-block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:999px;">
+            View the Restaurant Prototype →
+          </a>
+        </div>
+        ${closingHtml}
+      </div>
+    </div>
+  </body>
+</html>`;
+
 }
 
 function buildSubject(restaurantName, research = {}) {
@@ -104,14 +175,17 @@ export function createOutreachDraft({ lead, research = {}, channel = "email" }) 
 
   const restaurantName = clean(research.name) || clean(lead.name) || "your restaurant";
   const body = buildEmail({ restaurantName, research });
+  const html = buildHtmlEmail({ restaurantName, research });
 
   return {
     id: `OUT-${lead.id}-${channel}`,
     leadId: lead.id,
     channel,
     subject: buildSubject(restaurantName, research),
-    status: "draft",
     body,
+    html,
+    attachments: channel === "email" ? [PROTOTYPE_ATTACHMENT] : [],
+    status: "draft",
     createdAt: new Date().toISOString(),
     requiresHumanApproval: true,
     personalization: {
