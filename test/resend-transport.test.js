@@ -170,3 +170,39 @@ test("Resend transport sends the idempotency key on every retry", async () => {
 
   assert.deepEqual(headers, ["outreach-789", "outreach-789"]);
 });
+
+test("Resend transport sends HTML and attachment metadata when supplied", async () => {
+  let requestBody;
+
+  const transport = new ResendTransport({
+    apiKey: "test-key",
+    from: "sender@example.com",
+    fetchImpl: async (_url, options) => {
+      requestBody = JSON.parse(options.body);
+      return response({ data: { id: "msg-rich" } });
+    }
+  });
+
+  await transport.send({
+    recipient: "customer@example.com",
+    subject: "Prototype",
+    body: "Plain text fallback",
+    html: "<p>Styled email</p>",
+    attachments: [
+      {
+        path: "https://example.com/prototype.zip",
+        filename: "Restaurant-Website-Prototype.zip"
+      }
+    ],
+    idempotencyKey: "outreach-rich"
+  });
+
+  assert.equal(requestBody.text, "Plain text fallback");
+  assert.equal(requestBody.html, "<p>Styled email</p>");
+  assert.deepEqual(requestBody.attachments, [
+    {
+      path: "https://example.com/prototype.zip",
+      filename: "Restaurant-Website-Prototype.zip"
+    }
+  ]);
+});
