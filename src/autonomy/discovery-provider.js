@@ -5,7 +5,7 @@ export async function discoverFromConfiguredSource({
   env = process.env,
   fetchImpl = globalThis.fetch
 } = {}) {
-  const provider = String(env.AUTONOMOUS_DISCOVERY_PROVIDER || "osm").toLowerCase();
+  const provider = String(env.AUTONOMOUS_DISCOVERY_PROVIDER || "google").toLowerCase();
 
   if (provider === "osm" || provider === "openstreetmap") {
     return discoverFromOpenStreetMap({
