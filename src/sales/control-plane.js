@@ -168,6 +168,32 @@ export class SalesControlPlane {
     return clone(next);
   }
 
+  cancelOutreachApproval(draftId, { actor = AUDIT_ACTORS.AGENT, reason = "Outreach became ineligible for autonomous sending" } = {}) {
+    const approval = this.approvals.get(draftId);
+    if (!approval) throw new Error("Approval request not found");
+    if (approval.status !== "pending") throw new Error("Only pending outreach approvals can be cancelled");
+    if (actor !== AUDIT_ACTORS.AGENT) throw new Error("Outreach cancellation requires the agent actor");
+
+    const next = {
+      ...approval,
+      status: "cancelled",
+      decidedAt: this.clock(),
+      decidedBy: actor,
+      reason
+    };
+
+    this.approvals.set(draftId, next);
+    this.auditLog = appendAudit(this.auditLog, createAuditEvent({
+      leadId: approval.leadId,
+      actor,
+      action: "outreach_cancelled",
+      metadata: { draftId, reason },
+      timestamp: this.clock()
+    }));
+
+    return clone(next);
+  }
+
   decideOutreachApproval(draftId, approved, { actor = AUDIT_ACTORS.HUMAN, reason = "" } = {}) {
     if (actor !== AUDIT_ACTORS.HUMAN) throw new Error("Outreach approval requires a human actor");
     const approval = this.approvals.get(draftId);
