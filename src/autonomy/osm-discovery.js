@@ -317,7 +317,8 @@ export async function discoverFromOpenStreetMap({
         fetchImpl,
         maxAttempts: safeMaxAttempts,
         retryDelayMs: safeRetryDelayMs,
-        sleepImpl
+        sleepImpl,
+        requestTimeoutMs: safeRequestTimeoutMs
       });
 
       console.log(`OSM discovery tile ${tileIndex + 1}/${tiles.length} returned ${(data.elements ?? []).length} element(s)`);
