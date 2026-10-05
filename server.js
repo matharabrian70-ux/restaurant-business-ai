@@ -15,6 +15,7 @@ import { PostgresAutonomyStore } from "./src/autonomy/postgres-store.js";
 import { ComplianceStore } from "./src/sales/compliance-store.js";
 import { createManualSalesRuntime } from "./src/sales/manual-batch.js";
 import { extractSenderAddress } from "./src/sales/production-email-config.js";
+import { runProductionConsentE2E } from "./scripts/production-consent-e2e.js";
 
 const port = Number(process.env.PORT || 10000);
 
@@ -246,6 +247,43 @@ export function buildServer(
         await store.close().catch(() => {});
         res.writeHead(400, {"content-type": "application/json"});
         res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/control/autonomy/consent-e2e") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      if (env.PRODUCTION_CONSENT_E2E !== "true") {
+        res.writeHead(404, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "not_found" }));
+        return;
+      }
+
+      try {
+        const result = await runProductionConsentE2E(env);
+        res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"});
+        res.end(JSON.stringify({
+          status: "passed",
+          test: "production_consent_e2e",
+          result
+        }));
+      } catch (error) {
+        res.writeHead(503, {"content-type": "application/json"});
+        res.end(JSON.stringify({
+          status: "failed",
+          test: "production_consent_e2e",
+          error: error.message
+        }));
       }
       return;
     }
