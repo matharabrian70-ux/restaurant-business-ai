@@ -116,7 +116,8 @@ export class AutonomousSalesRunner {
               recipientAddress,
               sender: this.sender,
               policy: this.policy,
-              consent: record.consentState ?? "unknown"
+              consent: record.consentState ?? "unknown",
+              consentEvidence: record.consentEvidence
             });
 
           results.sent += 1;
