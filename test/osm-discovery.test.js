@@ -105,22 +105,22 @@ test("OSM discovery isolates website enrichment failures", async () => {
   assert.equal(result[0].signals.publicBusinessContact, false);
 });
 
-
 test("OSM discovery aborts a hung Overpass request and retries it", async () => {
   let attempts = 0;
   const delays = [];
 
-  await assert.rejects(
-    discoverFromOpenStreetMap({
-      bbox: "0,0,0.1,0.1",
-      maxResults: 1,
-      tileDegrees: 0.1,
-      maxAttempts: 2,
-      requestTimeoutMs: 5000,
-      endpoint: "https://overpass.example.test/api/interpreter",
-      fallbackEndpoints: [],
-      fetchImpl: async (_url, options) => {
-        attempts += 1;
+  const result = await discoverFromOpenStreetMap({
+    bbox: "0,0,0.1,0.1",
+    maxResults: 1,
+    tileDegrees: 0.1,
+    maxAttempts: 2,
+    requestTimeoutMs: 5000,
+    endpoint: "https://overpass.example.test/api/interpreter",
+    fallbackEndpoints: [],
+    fetchImpl: async (_url, options) => {
+      attempts += 1;
+
+      if (attempts === 1) {
         await new Promise((_, reject) => {
           options.signal.addEventListener("abort", () => {
             const error = new Error("aborted");
@@ -128,14 +128,27 @@ test("OSM discovery aborts a hung Overpass request and retries it", async () => 
             reject(error);
           }, { once: true });
         });
-      },
-      sleepImpl: async (delay) => {
-        delays.push(delay);
       }
-    }),
-    /timed out after 5000ms/
-  );
 
+      return jsonResponse({
+        elements: [
+          {
+            type: "node",
+            id: 123,
+            tags: {
+              name: "Retry Success Restaurant"
+            }
+          }
+        ]
+      });
+    },
+    sleepImpl: async (delay) => {
+      delays.push(delay);
+    }
+  });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].name, "Retry Success Restaurant");
   assert.equal(attempts, 2);
   assert.equal(delays.length, 1);
 });
