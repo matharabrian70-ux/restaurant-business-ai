@@ -11,6 +11,12 @@ const PROTOTYPE_ATTACHMENT = Object.freeze({
   filename: "Restaurant-Website-Prototype.zip"
 });
 
+const CUSTOMER_MENU_URL =
+  "https://matharabrian70-ux.github.io/restaurant-ordering-platform/menu.html";
+
+const CUSTOMER_CHECKOUT_URL =
+  "https://matharabrian70-ux.github.io/restaurant-ordering-platform/cart.html";
+
 function clean(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
@@ -95,16 +101,29 @@ function buildMessageParts({ restaurantName, research = {} }) {
   return {
     paragraphs,
     prototypeUrl: PROTOTYPE_URL,
+    customerMenuUrl: CUSTOMER_MENU_URL,
+    customerCheckoutUrl: CUSTOMER_CHECKOUT_URL,
     prototypeAttachment: PROTOTYPE_ATTACHMENT
   };
 }
 
 function buildEmail({ restaurantName, research = {} }) {
-  const { paragraphs, prototypeUrl } = buildMessageParts({ restaurantName, research });
+  const {
+    paragraphs,
+    prototypeUrl,
+    customerMenuUrl,
+    customerCheckoutUrl
+  } = buildMessageParts({ restaurantName, research });
   return [
     paragraphs[0],
     "",
     ...paragraphs.slice(1, 4).flatMap((paragraph) => [paragraph, ""]),
+    "Customer menu:",
+    customerMenuUrl,
+    "",
+    "Checkout:",
+    customerCheckoutUrl,
+    "",
     "Prototype:",
     prototypeUrl,
     "",
@@ -145,8 +164,18 @@ function buildHtmlEmail({ restaurantName, research = {} }) {
           <div style="font-size:14px;line-height:1.5;color:#5b6575;margin-bottom:16px;">
             Open the live prototype or use the attached prototype package to explore it locally.
           </div>
+          <div style="margin:0 0 12px;">
+            <a href="${escapeHtml(customerMenuUrl)}"
+               style="display:inline-block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:999px;margin:0 8px 8px 0;">
+              View Customer Menu →
+            </a>
+            <a href="${escapeHtml(customerCheckoutUrl)}"
+               style="display:inline-block;background:#ffffff;color:#168a4a;text-decoration:none;font-weight:700;padding:10px 17px;border:1px solid #168a4a;border-radius:999px;margin:0 0 8px 0;">
+              View Checkout →
+            </a>
+          </div>
           <a href="${escapeHtml(prototypeUrl)}"
-             style="display:inline-block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:999px;">
+             style="display:inline-block;color:#168a4a;text-decoration:none;font-weight:700;padding:4px 0;">
             View the Restaurant Prototype →
           </a>
         </div>
