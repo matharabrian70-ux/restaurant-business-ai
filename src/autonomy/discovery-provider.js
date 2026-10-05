@@ -12,6 +12,8 @@ export async function discoverFromConfiguredSource({
     return discoverFromOpenStreetMap({
       bbox: env.AUTONOMOUS_DISCOVERY_BBOX,
       maxResults: Number(env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
+      endpoint: env.AUTONOMOUS_OVERPASS_ENDPOINT,
+      fallbackEndpoints: env.AUTONOMOUS_OVERPASS_FALLBACK_ENDPOINTS,
       fetchImpl
     });
   }
