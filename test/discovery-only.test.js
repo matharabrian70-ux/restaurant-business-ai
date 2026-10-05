@@ -38,7 +38,7 @@ test("discovery-only test stores public restaurant data and sends nothing", asyn
         ok: true,
         async json() {
           return {
-            places: [{
+            elements: [{
               type: "node",
               id: 1,
               tags: { name: "Test Restaurant", website: "https://example.test" }
