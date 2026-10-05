@@ -117,6 +117,8 @@ test("OSM discovery aborts a hung Overpass request and retries it", async () => 
       tileDegrees: 0.1,
       maxAttempts: 2,
       requestTimeoutMs: 5000,
+      endpoint: "https://overpass.example.test/api/interpreter",
+      fallbackEndpoints: "",
       fetchImpl: async (_url, options) => {
         attempts += 1;
         await new Promise((_, reject) => {
