@@ -29,7 +29,7 @@ async function fetchWebsiteEmail(website, fetchImpl) {
     });
     if (!response.ok) return null;
     const html = await response.text();
-    const matches = html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi) ?? [];
+    const matches = html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
     return normalizeEmail(matches[0]);
   } catch {
     return null;
