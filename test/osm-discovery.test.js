@@ -15,7 +15,7 @@ function jsonResponse(data, status = 200) {
 test("OSM discovery splits a bbox into tiles, retries transient failures, deduplicates, and stops at the target", async () => {
   const calls = [];
   const delays = [];
-  let firstTileAttempts = 0;
+  let transientFailure = true;
 
   const result = await discoverFromOpenStreetMap({
     bbox: "0,0,0.5,0.5",
@@ -27,9 +27,9 @@ test("OSM discovery splits a bbox into tiles, retries transient failures, dedupl
       const query = new URLSearchParams(options.body).get("data");
       calls.push(query);
 
-      if (calls.length === 1) {
-        firstTileAttempts++;
-        if (firstTileAttempts === 1) return jsonResponse({}, 502);
+      if (transientFailure) {
+        transientFailure = false;
+        return jsonResponse({}, 502);
       }
 
       return jsonResponse({
