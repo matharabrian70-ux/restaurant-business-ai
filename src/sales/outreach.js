@@ -118,14 +118,16 @@ function buildEmail({ restaurantName, research = {} }) {
     paragraphs[0],
     "",
     ...paragraphs.slice(1, 4).flatMap((paragraph) => [paragraph, ""]),
+    "Explore the working restaurant experience below. Use any of the green links to open the website pages:",
+    "",
+    "This is the Website Prototype:",
+    prototypeUrl,
+    "",
     "This is the Customer Menu:",
     customerMenuUrl,
     "",
     "This is the Checkout System:",
     customerCheckoutUrl,
-    "",
-    "This is the Website Prototype:",
-    prototypeUrl,
     "",
     ...paragraphs.slice(5).flatMap((paragraph) => [paragraph, ""])
   ].join("\n").trim();
@@ -169,11 +171,29 @@ function buildHtmlEmail({ restaurantName, research = {} }) {
           <div style="font-size:14px;line-height:1.5;color:#5b6575;margin-bottom:16px;">
             Open the live prototype or use the attached prototype package to explore it locally.
           </div>
-          <div style="margin:0 0 12px;">
-            <a href="${escapeHtml(customerMenuUrl)}"
-               style="display:inline-block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:999px;margin:0 8px 8px 0;">
-              This is the Customer Menu →
-            </a>
+          <div style="font-size:14px;line-height:1.5;color:#5b6575;margin-bottom:18px;">
+            The website prototype is the first thing to explore. Use any of the green buttons below to open the website pages.
+          </div>
+          <div style="margin:0;">
+            <div style="margin:0 0 10px;">
+              <a href="${escapeHtml(prototypeUrl)}"
+                 style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
+                This is the Website Prototype →
+              </a>
+            </div>
+            <div style="margin:0 0 10px;">
+              <a href="${escapeHtml(customerMenuUrl)}"
+                 style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
+                This is the Customer Menu →
+              </a>
+            </div>
+            <div style="margin:0;">
+              <a href="${escapeHtml(customerCheckoutUrl)}"
+                 style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
+                This is the Checkout System →
+              </a>
+            </div>
+          </div>
             <a href="${escapeHtml(customerCheckoutUrl)}"
                style="display:inline-block;background:#ffffff;color:#168a4a;text-decoration:none;font-weight:700;padding:10px 17px;border:1px solid #168a4a;border-radius:999px;margin:0 0 8px 0;">
               This is the Checkout System →
