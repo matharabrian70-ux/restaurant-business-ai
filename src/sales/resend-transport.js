@@ -12,12 +12,31 @@ const RETRYABLE_NETWORK_CODES = new Set([
   "ENOTFOUND"
 ]);
 
-function getNetworkErrorCode(error) {
-  return error?.code ?? error?.cause?.code ?? null;
+function collectNetworkErrorCodes(error, seen = new Set()) {
+  if (!error || (typeof error !== "object" && typeof error !== "function") || seen.has(error)) {
+    return [];
+  }
+
+  seen.add(error);
+
+  const codes = [];
+  if (typeof error.code === "string") codes.push(error.code);
+
+  if (error.cause) {
+    codes.push(...collectNetworkErrorCodes(error.cause, seen));
+  }
+
+  if (Array.isArray(error.errors)) {
+    for (const nestedError of error.errors) {
+      codes.push(...collectNetworkErrorCodes(nestedError, seen));
+    }
+  }
+
+  return codes;
 }
 
 function isRetryableNetworkError(error) {
-  return RETRYABLE_NETWORK_CODES.has(getNetworkErrorCode(error));
+  return collectNetworkErrorCodes(error).some((code) => RETRYABLE_NETWORK_CODES.has(code));
 }
 
 function sleep(ms) {
