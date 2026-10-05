@@ -103,15 +103,6 @@ export function buildServer(
       return;
     }
 
-    if (pathname.startsWith("/control/")) {
-      const handled = await handleControlRequest(
-        req,
-        res
-      );
-
-      if (handled) return;
-    }
-
     if (req.method === "POST" && pathname === "/control/pilot/prepare") {
       const authorization = req.headers.authorization || "";
       const suppliedToken = authorization.startsWith("Bearer ")
@@ -133,6 +124,15 @@ export function buildServer(
         res.end(JSON.stringify({ error: error.message }));
       }
       return;
+    }
+
+    if (pathname.startsWith("/control/")) {
+      const handled = await handleControlRequest(
+        req,
+        res
+      );
+
+      if (handled) return;
     }
 
     if (req.method === "POST" && pathname === "/autonomy/discovery-test") {
