@@ -174,6 +174,112 @@ export function buildServer(
       return;
     }
 
+    if (req.method === "POST" && pathname === "/control/autonomy/consent") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      const store = new PostgresAutonomyStore({
+        connectionString: env.DATABASE_URL
+      });
+
+      try {
+        const body = JSON.parse(await readBody(req) || "{}");
+        const result = await store.recordConsent({
+          email: body.email,
+          source: body.source,
+          at: body.at,
+          method: body.method
+        });
+        await store.close();
+        res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"});
+        res.end(JSON.stringify({
+          status: "recorded",
+          consent: result
+        }));
+      } catch (error) {
+        await store.close().catch(() => {});
+        res.writeHead(400, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/control/autonomy/revoke-consent") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      const store = new PostgresAutonomyStore({
+        connectionString: env.DATABASE_URL
+      });
+
+      try {
+        const body = JSON.parse(await readBody(req) || "{}");
+        const result = await store.revokeConsent({
+          email: body.email,
+          source: body.source || "operator recorded recipient opt-out",
+          at: body.at,
+          method: body.method || "opt_out"
+        });
+        await store.close();
+        res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"});
+        res.end(JSON.stringify({
+          status: "revoked",
+          consent: result
+        }));
+      } catch (error) {
+        await store.close().catch(() => {});
+        res.writeHead(400, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/control/autonomy/consent") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      const email = requestUrl.searchParams.get("email") || "";
+      const store = new PostgresAutonomyStore({
+        connectionString: env.DATABASE_URL
+      });
+
+      try {
+        const consent = await store.getConsentByEmail(email);
+        await store.close();
+        res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"});
+        res.end(JSON.stringify({ consent }));
+      } catch (error) {
+        await store.close().catch(() => {});
+        res.writeHead(400, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
     if (req.method === "POST" && pathname === "/control/pilot/send-eligible") {
       const authorization = req.headers.authorization || "";
       const suppliedToken = authorization.startsWith("Bearer ")
