@@ -132,7 +132,12 @@ function buildEmail({ restaurantName, research = {} }) {
 }
 
 function buildHtmlEmail({ restaurantName, research = {} }) {
-  const { paragraphs, prototypeUrl } = buildMessageParts({ restaurantName, research });
+  const {
+    paragraphs,
+    prototypeUrl,
+    customerMenuUrl,
+    customerCheckoutUrl
+  } = buildMessageParts({ restaurantName, research });
   const [greeting, ...rest] = paragraphs;
   const closingIndex = rest.findIndex((paragraph) => paragraph === "Regards,");
   const bodyParagraphs = closingIndex >= 0 ? rest.slice(0, closingIndex) : rest;
@@ -167,16 +172,16 @@ function buildHtmlEmail({ restaurantName, research = {} }) {
           <div style="margin:0 0 12px;">
             <a href="${escapeHtml(customerMenuUrl)}"
                style="display:inline-block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:999px;margin:0 8px 8px 0;">
-              View Customer Menu →
+              This is the Customer Menu →
             </a>
             <a href="${escapeHtml(customerCheckoutUrl)}"
                style="display:inline-block;background:#ffffff;color:#168a4a;text-decoration:none;font-weight:700;padding:10px 17px;border:1px solid #168a4a;border-radius:999px;margin:0 0 8px 0;">
-              View Checkout →
+              This is the Checkout System →
             </a>
           </div>
           <a href="${escapeHtml(prototypeUrl)}"
              style="display:inline-block;color:#168a4a;text-decoration:none;font-weight:700;padding:4px 0;">
-            View the Restaurant Prototype →
+            This is the Website Prototype →
           </a>
         </div>
         ${closingHtml}
