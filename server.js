@@ -103,6 +103,25 @@ export function buildServer(
       return;
     }
 
+    if (req.method === "GET" && pathname === "/control/pilot/drafts") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type": "application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      res.writeHead(200, {"content-type": "application/json", "cache-control": "no-store"});
+      res.end(JSON.stringify({
+        drafts: manualSalesRuntime.listPreparedDrafts()
+      }));
+      return;
+    }
+
     if (req.method === "POST" && pathname === "/control/pilot/prepare") {
       const authorization = req.headers.authorization || "";
       const suppliedToken = authorization.startsWith("Bearer ")
