@@ -27,7 +27,8 @@ export function createHandoffNotifier({ transport, recipient, sender }) {
       body,
       recipient,
       subject,
-      from: sender
+      from: sender,
+      idempotencyKey: `HANDOFF-${handoff.leadId}`
     });
   };
 }
