@@ -30,38 +30,38 @@ function fakeStore() {
   };
 }
 
-test("discovery-only test stores public restaurant data and sends nothing", async () => {
+test("discovery-only test stores Foursquare restaurant data and sends nothing", async () => {
   const store = fakeStore();
+
   const fetchImpl = async (url) => {
-    if (String(url).includes("overpass-api.de")) {
+    if (String(url).startsWith("https://places-api.foursquare.com/places/search")) {
       return {
         ok: true,
         async json() {
           return {
-            elements: [{
-              type: "node",
-              id: 1,
-              tags: { name: "Test Restaurant", website: "https://example.test" }
+            results: [{
+              fsq_place_id: "fsq-discovery-test",
+              name: "Test Restaurant",
+              location: { formatted_address: "Westlands, Nairobi, Kenya" },
+              email: "hello@example.test",
+              website: null
             }]
           };
         }
       };
     }
 
-    return {
-      ok: true,
-      async text() {
-        return "<html>hello@example.test</html>";
-      }
-    };
+    throw new Error(`Unexpected URL: ${url}`);
   };
 
   const result = await runDiscoveryOnlyTest({
     env: {
-      AUTONOMOUS_DISCOVERY_PROVIDER: "osm",
-      AUTONOMOUS_SALES_ENABLED: "false",
-      AUTONOMOUS_OVERPASS_ENDPOINT: "https://overpass-api.de/api/interpreter",
-      AUTONOMOUS_OVERPASS_FALLBACK_ENDPOINTS: ""
+      AUTONOMOUS_DISCOVERY_PROVIDER: "foursquare",
+      AUTONOMOUS_DISCOVERY_NEAR: "Nairobi, Kenya",
+      AUTONOMOUS_DISCOVERY_PAGE_SIZE: "5",
+      AUTONOMOUS_DISCOVERY_DAILY_TARGET: "5",
+      FOURSQUARE_API_KEY: "test-key",
+      AUTONOMOUS_SALES_ENABLED: "false"
     },
     store,
     fetchImpl
@@ -78,9 +78,10 @@ test("discovery-only test stores public restaurant data and sends nothing", asyn
     emailsSent: 0
   });
 
-  const lead = store.leads.get("website:example.test");
+  const lead = store.leads.get("email:hello@example.test");
   assert.equal(lead.stage, "discovered");
   assert.equal(lead.email, "hello@example.test");
   assert.equal(lead.payload.discoveryTest, true);
+  assert.equal(lead.payload.source, "public_business_directory");
   assert.equal(store.events.size, 1);
 });
