@@ -11,9 +11,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const env = process.env;
-
-assert(env.PRODUCTION_CONSENT_E2E === "true", "PRODUCTION_CONSENT_E2E must be true");
+export async function runProductionConsentE2E(env = process.env) {
+  assert(env.PRODUCTION_CONSENT_E2E === "true", "PRODUCTION_CONSENT_E2E must be true");
 assert(env.DATABASE_URL, "DATABASE_URL is required");
 assert(env.RESEND_API_KEY, "RESEND_API_KEY is required");
 assert(env.RESEND_FROM, "RESEND_FROM is required");
@@ -23,8 +22,11 @@ assert(env.RESEND_DOMAIN_VERIFIED === "true", "RESEND_DOMAIN_VERIFIED must be tr
 const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
 const transport = createConfiguredTransport(env);
 
-try {
-  await store.init();
+  const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+  const transport = createConfiguredTransport(env);
+
+  try {
+    await store.init();
 
   console.log("1/5 RECORD CONSENT");
   const recorded = await store.recordConsent({
@@ -191,5 +193,16 @@ try {
 
   console.log("PRODUCTION CONSENT E2E: PASS");
 } finally {
-  await store.close();
+    await store.close();
+  }
+
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    await runProductionConsentE2E(process.env);
+  } catch (error) {
+    console.error("PRODUCTION CONSENT E2E: FAIL");
+    console.error(error);
+    process.exitCode = 1;
+  }
 }
