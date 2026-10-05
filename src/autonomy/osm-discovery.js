@@ -289,7 +289,7 @@ export async function discoverFromOpenStreetMap({
   bbox = process.env.AUTONOMOUS_DISCOVERY_BBOX || DEFAULT_BBOX,
   maxResults = Number(process.env.AUTONOMOUS_DISCOVERY_PAGE_SIZE || 20),
   endpoint = process.env.AUTONOMOUS_OVERPASS_ENDPOINT || DEFAULT_OVERPASS_ENDPOINT,
-  fallbackEndpoints = process.env.AUTONOMOUS_OVERPASS_FALLBACK_ENDPOINTS || DEFAULT_OVERPASS_FALLBACK_ENDPOINTS.join(","),
+  fallbackEndpoints = process.env.AUTONOMOUS_OVERPASS_FALLBACK_ENDPOINTS,
   tileDegrees = Number(process.env.AUTONOMOUS_DISCOVERY_TILE_DEGREES || DEFAULT_TILE_DEGREES),
   maxTiles = Number(process.env.AUTONOMOUS_DISCOVERY_MAX_TILES || DEFAULT_MAX_TILES),
   maxAttempts = Number(process.env.AUTONOMOUS_DISCOVERY_MAX_ATTEMPTS || DEFAULT_MAX_ATTEMPTS),
@@ -309,9 +309,14 @@ export async function discoverFromOpenStreetMap({
   const safeMaxRuntimeMs = Math.min(600_000, Math.max(30_000, Number(maxRuntimeMs) || DEFAULT_MAX_RUNTIME_MS));
   const startedAt = Date.now();
 
+  const effectiveFallbackEndpoints =
+    fallbackEndpoints == null
+      ? DEFAULT_OVERPASS_FALLBACK_ENDPOINTS.join(",")
+      : fallbackEndpoints;
+
   const configuredEndpoints = [
     endpoint,
-    ...String(fallbackEndpoints)
+    ...String(effectiveFallbackEndpoints)
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
