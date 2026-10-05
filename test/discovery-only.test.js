@@ -62,6 +62,8 @@ test("discovery-only test stores public restaurant data and sends nothing", asyn
       AUTONOMOUS_SALES_ENABLED: "false"
     },
     store,
+    endpoint: "https://overpass-api.de/api/interpreter",
+    fallbackEndpoints: "",
     fetchImpl
   });
 
