@@ -33,16 +33,15 @@ function fakeStore() {
 test("discovery-only test stores public restaurant data and sends nothing", async () => {
   const store = fakeStore();
   const fetchImpl = async (url) => {
-    if (String(url).includes("places.googleapis.com")) {
+    if (String(url).includes("overpass-api.de")) {
       return {
         ok: true,
         async json() {
           return {
             places: [{
-              id: "place-1",
-              displayName: { text: "Test Restaurant" },
-              formattedAddress: "Nairobi, Kenya",
-              websiteUri: "https://example.test"
+              type: "node",
+              id: 1,
+              tags: { name: "Test Restaurant", website: "https://example.test" }
             }]
           };
         }
@@ -59,7 +58,7 @@ test("discovery-only test stores public restaurant data and sends nothing", asyn
 
   const result = await runDiscoveryOnlyTest({
     env: {
-      GOOGLE_PLACES_API_KEY: "test-key",
+      AUTONOMOUS_DISCOVERY_PROVIDER: "osm",
       AUTONOMOUS_SALES_ENABLED: "false"
     },
     store,
