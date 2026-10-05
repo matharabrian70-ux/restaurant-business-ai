@@ -6,6 +6,7 @@ export async function sendThroughControlPlane({
   recipient,
   policy,
   transport,
+  replyTo,
   actor = "agent"
 }) {
   if (!controlPlane?.isOutreachApproved) {
@@ -21,7 +22,7 @@ export async function sendThroughControlPlane({
     throw new Error("Sales control plane approval is required before sending");
   }
 
-  const result = await sendApproved({ draft, recipient, policy, transport });
+  const result = await sendApproved({ draft, recipient, policy, transport, replyTo });
 
   controlPlane.transitionLead(
     draft.leadId,
