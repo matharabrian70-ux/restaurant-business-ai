@@ -23,6 +23,10 @@ export async function sendApproved({ draft, recipient, policy, transport, replyT
     channel: draft.channel,
     subject: draft.subject || "",
     body: draft.body,
+    ...(draft.html ? { html: draft.html } : {}),
+    ...(Array.isArray(draft.attachments) && draft.attachments.length
+      ? { attachments: draft.attachments }
+      : {}),
     recipient: recipient.address,
     replyTo,
     idempotencyKey: draft.id
