@@ -103,6 +103,22 @@ export class PostgresAutonomyStore {
     return rows;
   }
 
+  async listLeads({ limit = 500 } = {}) {
+    const { rows } = await this.pool.query(
+      "SELECT * FROM autonomy_leads ORDER BY updated_at DESC LIMIT $1",
+      [Math.min(Math.max(Number(limit) || 500, 1), 1000)]
+    );
+    return rows;
+  }
+
+  async listEvents({ limit = 1000 } = {}) {
+    const { rows } = await this.pool.query(
+      "SELECT event_id, event_type, payload, created_at FROM autonomy_events ORDER BY created_at DESC LIMIT $1",
+      [Math.min(Math.max(Number(limit) || 1000, 1), 2000)]
+    );
+    return rows;
+  }
+
   async recordEvent(eventId, eventType, payload) {
     const result = await this.pool.query(
       `INSERT INTO autonomy_events(event_id,event_type,payload)
