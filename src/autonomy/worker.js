@@ -131,18 +131,6 @@ export class AutonomousWorker {
 
       const prepared = pipeline.prepareOutreach(added.lead.id, "email");
 
-      await this.store.recordEvent(
-        "draft:" + prepared.draft.id,
-        "outreach.drafted",
-        {
-          draftId: prepared.draft.id,
-          leadId: added.lead.id,
-          recipient: record.email,
-          subject: prepared.draft.subject,
-          createdAt: new Date().toISOString()
-        }
-      );
-
       const directMarketingPolicy = createDirectMarketingPolicy();
       const eligibility = validateDirectMarketingEligibility({
         recipient: { address: record.email },
@@ -173,6 +161,18 @@ export class AutonomousWorker {
         skipped++;
         continue;
       }
+
+      await this.store.recordEvent(
+        "draft:" + prepared.draft.id,
+        "outreach.drafted",
+        {
+          draftId: prepared.draft.id,
+          leadId: added.lead.id,
+          recipient: record.email,
+          subject: prepared.draft.subject,
+          createdAt: new Date().toISOString()
+        }
+      );
 
       pipeline.authorizeAutonomousOutreach(prepared.draft.id, {
         reason: "Autonomous sales policy with recorded consent"
