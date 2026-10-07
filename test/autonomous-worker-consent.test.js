@@ -5,8 +5,10 @@ import { PILOT_STATUS } from "../src/sales/pilot.js";
 
 function createStore(initialPilot = null) {
   const values = new Map(initialPilot ? [["pilot", initialPilot]] : []);
+  const events = [];
   return {
     values,
+    events,
     async init() {},
     async get(key) { return values.get(key) ?? null; },
     async set(key, value) { values.set(key, value); },
@@ -14,7 +16,12 @@ function createStore(initialPilot = null) {
     async getConsentByEmail() { return null; },
     async revokeConsent() {},
     async upsertLead() { throw new Error("ineligible lead must not be persisted as contacted"); },
-    async recordEvent() { throw new Error("ineligible lead must not record a sent event"); },
+    async recordEvent(id, type, payload) {
+      events.push({ id, type, payload });
+      if (type === "outreach.sent") {
+        throw new Error("ineligible lead must not record a sent event");
+      }
+    },
     async close() {}
   };
 }
@@ -58,6 +65,8 @@ test("autonomous worker skips an ineligible lead without authorizing or sending"
   assert.equal(result.discovered, 1);
   assert.equal(result.skipped, 1);
   assert.equal(sends, 0);
+  assert.equal(store.events.some(event => event.type === "outreach.sent"), false);
+  assert.equal(store.events.some(event => event.type === "outreach.blocked"), true);
 });
 
 test("persisted active pilot is disabled by the environment kill switch", async () => {
