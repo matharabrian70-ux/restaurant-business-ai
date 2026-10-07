@@ -131,6 +131,18 @@ export class AutonomousWorker {
 
       const prepared = pipeline.prepareOutreach(added.lead.id, "email");
 
+      await this.store.recordEvent(
+        "draft:" + prepared.draft.id,
+        "outreach.drafted",
+        {
+          draftId: prepared.draft.id,
+          leadId: added.lead.id,
+          recipient: record.email,
+          subject: prepared.draft.subject,
+          createdAt: new Date().toISOString()
+        }
+      );
+
       const directMarketingPolicy = createDirectMarketingPolicy();
       const eligibility = validateDirectMarketingEligibility({
         recipient: { address: record.email },
@@ -149,6 +161,15 @@ export class AutonomousWorker {
           actor: "agent",
           reason: "Autonomous outreach skipped: " + eligibility.errors.join("; ")
         });
+        await this.store.recordEvent(
+          "blocked:" + prepared.draft.id,
+          "outreach.blocked",
+          {
+            draftId: prepared.draft.id,
+            leadId: added.lead.id,
+            reasons: eligibility.errors
+          }
+        );
         skipped++;
         continue;
       }
@@ -156,6 +177,17 @@ export class AutonomousWorker {
       pipeline.authorizeAutonomousOutreach(prepared.draft.id, {
         reason: "Autonomous sales policy with recorded consent"
       });
+
+      await this.store.recordEvent(
+        "approval:" + prepared.draft.id,
+        "outreach.approved",
+        {
+          draftId: prepared.draft.id,
+          leadId: added.lead.id,
+          mode: "autonomous_policy",
+          approvedAt: new Date().toISOString()
+        }
+      );
 
       const result = await pipeline.sendApprovedOutreach({
         draftId: prepared.draft.id,
