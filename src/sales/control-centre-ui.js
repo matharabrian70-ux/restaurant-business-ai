@@ -763,6 +763,11 @@ export function renderControlCentre() {
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
   }
+
+  // Keep the operational view moving without requiring a manual refresh.
+  setInterval(() => {
+    if (getToken()) loadAll();
+  }, 15000);
 </script>
 </body>
 </html>`;
