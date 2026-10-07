@@ -23,7 +23,10 @@ function buildControlledTestContent(env = process.env) {
     channel: "email"
   });
 
-  return draft;
+  return {
+    ...draft,
+    body: "This is a controlled communication test.\\n\\n" + draft.body
+  };
 }
 
 export function validateControlledTestConfig(env = process.env) {
