@@ -178,7 +178,7 @@ function buildHtmlEmail({ restaurantName, research = {} }) {
             <div style="margin:0 0 10px;">
               <a href="${escapeHtml(prototypeUrl)}"
                  style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
-                This is the Website Prototype →
+                View the Restaurant Prototype →
               </a>
             </div>
             <div style="margin:0 0 10px;">
