@@ -81,6 +81,95 @@ export function buildServer(
       return;
     }
 
+    if (req.method === "GET" && pathname === "/control/metrics") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ")
+        ? authorization.slice(7)
+        : "";
+
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, {"content-type":"application/json"});
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+
+      const store = new PostgresAutonomyStore({
+        connectionString: env.DATABASE_URL
+      });
+
+      try {
+        await store.init();
+        const [persistentLeads, events] = await Promise.all([
+          store.listLeads({ limit: 500 }),
+          store.listEvents({ limit: 2000 })
+        ]);
+
+        const queue = controlPlane.listQueue({ limit: 100 });
+        const approvals = controlPlane.listApprovals();
+        const preparedStates = manualSalesRuntime.listPreparedDrafts();
+        const preparedDrafts = preparedStates.flatMap(state => state.drafts || []);
+
+        const eventCount = (type) =>
+          events.filter(event => event.event_type === type).length;
+
+        const interested = persistentLeads.filter(lead =>
+          ["engaged", "human_handoff", "closed_won"].includes(lead.stage)
+        ).length;
+
+        const customers = persistentLeads.filter(
+          lead => lead.stage === "closed_won"
+        ).length;
+
+        const revenueEvents = events.filter(event =>
+          ["customer.payment", "revenue.recorded"].includes(event.event_type)
+        );
+        const revenue = revenueEvents.reduce((sum, event) => {
+          const amount = Number(event.payload?.amount ?? event.payload?.revenue ?? 0);
+          return Number.isFinite(amount) ? sum + amount : sum;
+        }, 0);
+
+        const metrics = {
+          leads: Math.max(queue.length, persistentLeads.length),
+          drafted: Math.max(
+            preparedDrafts.length,
+            eventCount("outreach.drafted")
+          ),
+          approved: Math.max(
+            approvals.filter(a => a.status === "approved").length,
+            eventCount("outreach.approved")
+          ),
+          sent: eventCount("outreach.sent"),
+          delivered: eventCount("email.delivered"),
+          replied: eventCount("email.received"),
+          interested,
+          customers,
+          revenue,
+          pendingApprovals: approvals.filter(a => a.status === "pending").length,
+          blocked: eventCount("outreach.blocked"),
+          failed: eventCount("outreach.failed"),
+          bounced: eventCount("email.bounced"),
+          complained: eventCount("email.complained"),
+          lastActivityAt: events[0]?.created_at ?? null,
+          lastActivityType: events[0]?.event_type ?? null
+        };
+
+        await store.close();
+        res.writeHead(200, {
+          "content-type": "application/json",
+          "cache-control": "no-store"
+        });
+        res.end(JSON.stringify({ metrics }));
+      } catch (error) {
+        await store.close().catch(() => {});
+        res.writeHead(503, {"content-type":"application/json"});
+        res.end(JSON.stringify({
+          error: "metrics_unavailable",
+          detail: error.message
+        }));
+      }
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/control") {
       if (!env.CONTROL_PLANE_TOKEN) {
         res.writeHead(503, {
