@@ -104,9 +104,55 @@ export function renderControlCentre() {
 
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 14px;
       margin-bottom: 18px;
+    }
+
+    .funnel {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(110px, 1fr));
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .funnel-step {
+      min-width: 110px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      position: relative;
+    }
+
+    .funnel-step strong {
+      display: block;
+      font-size: 24px;
+      margin-top: 5px;
+    }
+
+    .funnel-arrow {
+      position: absolute;
+      right: -8px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #98a2b3;
+      font-weight: 700;
+      z-index: 2;
+    }
+
+    .activity {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-radius: 9px;
+      color: #667085;
+      font-size: 13px;
     }
 
     .stat {
@@ -176,6 +222,10 @@ export function renderControlCentre() {
         grid-template-columns: repeat(2, 1fr);
       }
 
+      .funnel {
+        grid-template-columns: repeat(9, minmax(130px, 1fr));
+      }
+
       .lead {
         grid-template-columns: 1fr;
       }
@@ -236,6 +286,20 @@ export function renderControlCentre() {
       <div class="stat">
         Human handoffs
         <strong id="handoffCount">0</strong>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>Live Sales Funnel</h2>
+        <button class="muted" onclick="loadMetrics()">Refresh metrics</button>
+      </div>
+      <div id="funnel" class="funnel">
+        Connect to load live pipeline metrics.
+      </div>
+      <div id="activity" class="activity">
+        <span>Last activity: —</span>
+        <span>Pipeline state: waiting</span>
       </div>
     </section>
 
@@ -352,16 +416,18 @@ export function renderControlCentre() {
     }
 
     try {
-      const [queueData, approvalData, draftData] = await Promise.all([
+      const [queueData, approvalData, draftData, metricData] = await Promise.all([
         api("/control/queue"),
         api("/control/approvals"),
-        api("/control/pilot/drafts")
+        api("/control/pilot/drafts"),
+        api("/control/metrics")
       ]);
 
       renderQueue(queueData.queue);
       renderApprovals(approvalData.approvals);
       renderDrafts(draftData.drafts);
       updateStats(queueData.queue, approvalData.approvals);
+      renderMetrics(metricData.metrics);
 
       setMessage("Control Centre synchronized.");
     } catch (error) {
@@ -513,6 +579,49 @@ export function renderControlCentre() {
     } catch (error) {
       setMessage(error.message);
     }
+  }
+
+  async function loadMetrics() {
+    try {
+      const data = await api("/control/metrics");
+      renderMetrics(data.metrics);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  function renderMetrics(metrics) {
+    const labels = [
+      ["Leads", metrics.leads],
+      ["Drafted", metrics.drafted],
+      ["Approved", metrics.approved],
+      ["Sent", metrics.sent],
+      ["Delivered", metrics.delivered],
+      ["Replied", metrics.replied],
+      ["Interested", metrics.interested],
+      ["Customer", metrics.customers],
+      ["Revenue", Number(metrics.revenue || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})]
+    ];
+
+    document.getElementById("funnel").innerHTML = labels.map((item, index) => `
+      <div class="funnel-step">
+        <div>${escapeHtml(item[0])}</div>
+        <strong>${escapeHtml(item[1])}</strong>
+        ${index < labels.length - 1 ? '<span class="funnel-arrow">→</span>' : ""}
+      </div>
+    `).join("");
+
+    const last = metrics.lastActivityAt
+      ? new Date(metrics.lastActivityAt).toLocaleString()
+      : "No persistent activity recorded yet";
+    const type = metrics.lastActivityType || "waiting";
+    document.getElementById("activity").innerHTML =
+      "<span>Last activity: " + escapeHtml(last) + "</span>" +
+      "<span>State: " + escapeHtml(type) +
+      " · Pending approvals: " + escapeHtml(metrics.pendingApprovals) +
+      " · Blocked: " + escapeHtml(metrics.blocked) +
+      " · Bounced: " + escapeHtml(metrics.bounced) +
+      " · Complaints: " + escapeHtml(metrics.complained) + "</span>";
   }
 
   async function loadDrafts() {
