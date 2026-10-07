@@ -603,13 +603,13 @@ export function renderControlCentre() {
       ["Revenue", Number(metrics.revenue || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})]
     ];
 
-    document.getElementById("funnel").innerHTML = labels.map((item, index) => `
-      <div class="funnel-step">
-        <div>${escapeHtml(item[0])}</div>
-        <strong>${escapeHtml(item[1])}</strong>
-        ${index < labels.length - 1 ? '<span class="funnel-arrow">→</span>' : ""}
-      </div>
-    `).join("");
+    document.getElementById("funnel").innerHTML = labels.map((item, index) =>
+      '<div class="funnel-step">' +
+        '<div>' + escapeHtml(item[0]) + '</div>' +
+        '<strong>' + escapeHtml(item[1]) + '</strong>' +
+        (index < labels.length - 1 ? '<span class="funnel-arrow">→</span>' : "") +
+      '</div>'
+    ).join("");
 
     const last = metrics.lastActivityAt
       ? new Date(metrics.lastActivityAt).toLocaleString()
