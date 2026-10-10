@@ -22,6 +22,68 @@ const PORTFOLIO_URL =
 const HOTEL_DEMO_URL =
   "https://matharabrian70-ux.github.io/hotel-website-demo/#stay";
 
+
+const PRICING = Object.freeze({
+  KE: Object.freeze({ currency: "KES", restaurantWebsite: "KSh 30,000", restaurantOrdering: "KSh 80,000", hotelWebsite: "KSh 30,000" }),
+  INTERNATIONAL: Object.freeze({ currency: "USD", restaurantWebsite: "US$230", restaurantOrdering: "US$615", hotelWebsite: "US$230" })
+});
+
+function isHotelLead(lead = {}, research = {}) {
+  const type = [lead.businessType, lead.sector, lead.category, research.businessType, research.sector, research.category]
+    .filter(Boolean).join(" ").toLowerCase();
+  return /hotel|lodge|resort|guest.?house|hospitality/.test(type);
+}
+
+function isKenyanLead(lead = {}, research = {}) {
+  const location = [lead.country, lead.location, lead.address, research.country, research.location, research.address, research.currency]
+    .filter(Boolean).join(" ").toLowerCase();
+  return /kenya|\bke\b|kes|ksh|k\.sh/.test(location);
+}
+
+function buildHotelEmail({ businessName, research = {}, price }) {
+  const notes = Array.isArray(research.notes) ? research.notes.filter(Boolean).map(String) : [];
+  const personal = notes[0] ? `I noticed ${notes[0]}` : `I wanted to share a practical website idea for ${businessName}, rather than send a generic pitch.`;
+  return [
+    `Hello ${businessName} team,`,
+    "",
+    personal,
+    "I build hospitality websites designed to present rooms and facilities clearly, showcase photographs and amenities, answer common guest questions, and make it easier for visitors to enquire or contact your team directly.",
+    notes[1] ? `Another detail from my research: ${notes[1]}` : "",
+    "I can tailor the structure and visual style around your property, its facilities and the guests you want to reach. I would confirm the exact pages, content, and enquiry/contact features with you before work begins.",
+    `Website package: ${price} one-time setup.`,
+    "See the hotel website demonstration:",
+    HOTEL_DEMO_URL,
+    "",
+    "My portfolio:",
+    PORTFOLIO_URL,
+    "",
+    "If useful, I can send a short outline tailored to your property. There is no obligation to proceed.",
+    "If you are not the right contact, I would appreciate being directed to the person responsible for the website or marketing.",
+    "If you would rather not receive messages from me, reply STOP and I will not follow up.",
+    "",
+    "Regards,",
+    "Brian Mathara",
+    "Mathara Digital"
+  ].filter(Boolean).join("\n");
+}
+
+function buildHotelHtml({ businessName, research = {}, price }) {
+  const notes = Array.isArray(research.notes) ? research.notes.filter(Boolean).map(String) : [];
+  const intro = notes[0] ? `I noticed ${notes[0]}` : `I wanted to share a practical website idea for ${businessName}, rather than send a generic pitch.`;
+  const paragraphs = [
+    intro,
+    "I build hospitality websites designed to present rooms and facilities clearly, showcase photographs and amenities, answer common guest questions, and make it easier for visitors to enquire or contact your team directly.",
+    ...(notes[1] ? [`Another detail from my research: ${notes[1]}`] : []),
+    "I can tailor the structure and visual style around your property, its facilities and the guests you want to reach. I would confirm the exact pages, content, and enquiry/contact features with you before work begins.",
+    `Website package: ${price} one-time setup.`,
+    "If useful, I can send a short outline tailored to your property. There is no obligation to proceed.",
+    "If you are not the right contact, I would appreciate being directed to the person responsible for the website or marketing.",
+    "If you would rather not receive messages from me, reply STOP and I will not follow up."
+  ];
+  const button = (url, label) => `<p style="margin:0 0 10px"><a href="${escapeHtml(url)}" style="display:block;background:#168a4a;color:#fff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px">${escapeHtml(label)} →</a></p>`;
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#172033"><div style="max-width:680px;margin:0 auto;padding:28px 16px"><div style="background:#fff;border:1px solid #e3e7ed;border-radius:14px;padding:34px"><div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4b6b8a;margin-bottom:22px">Mathara Digital</div><h1 style="font-size:24px;line-height:1.25;margin:0 0 24px;color:#111827">A website idea for ${escapeHtml(businessName)}</h1><p>Hello ${escapeHtml(businessName)} team,</p>${paragraphs.map(p=>`<p style="margin:0 0 18px">${escapeHtml(p)}</p>`).join("")}<div style="margin:8px 0 28px;padding:20px;background:#f7faf8;border:1px solid #dce9df;border-radius:12px"><div style="font-size:16px;font-weight:700;margin-bottom:14px">Website demonstration and work</div>${button(HOTEL_DEMO_URL,"View Hotel Website Demo")}${button(PORTFOLIO_URL,"View Portfolio")}</div><p>Regards,</p><p>Brian Mathara<br>Mathara Digital</p></div></div></body></html>`;
+}
+
 function clean(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
@@ -247,23 +309,35 @@ export function createOutreachDraft({ lead, research = {}, channel = "email" }) 
   if (!lead?.id) throw new Error("Lead is required");
   if (!CHANNELS.includes(channel)) throw new Error("Unsupported outreach channel");
 
-  const restaurantName = clean(research.name) || clean(lead.name) || "your restaurant";
-  const body = buildEmail({ restaurantName, research });
-  const html = buildHtmlEmail({ restaurantName, research });
+  const businessName = clean(research.name) || clean(lead.name) || "your business";
+  const hotel = isHotelLead(lead, research);
+  const pricing = isKenyanLead(lead, research) ? PRICING.KE : PRICING.INTERNATIONAL;
+  const price = hotel ? pricing.hotelWebsite : pricing.restaurantWebsite;
+  const body = hotel
+    ? buildHotelEmail({ businessName, research, price })
+    : buildEmail({ restaurantName: businessName, research }) +
+      `\n\nPackages (one-time setup):\n1. Website: ${pricing.restaurantWebsite}\n2. Website + Ordering System: ${pricing.restaurantOrdering}\n\nMy portfolio:\n${PORTFOLIO_URL}`;
+  const html = hotel
+    ? buildHotelHtml({ businessName, research, price })
+    : buildHtmlEmail({ restaurantName: businessName, research }).replace(
+        "</div>\\n        ${closingHtml}",
+        `<div style="margin:0 0 16px;padding:16px;background:#f7faf8;border:1px solid #dce9df;border-radius:12px"><strong>Packages (one-time setup)</strong><p>Website: ${escapeHtml(pricing.restaurantWebsite)}</p><p>Website + Ordering System: ${escapeHtml(pricing.restaurantOrdering)}</p></div></div>\\n        ${closingHtml}`
+      );
 
   return {
     id: `OUT-${lead.id}-${channel}`,
     leadId: lead.id,
     channel,
-    subject: buildSubject(restaurantName, research),
+    subject: hotel ? `A website idea for ${businessName}` : buildSubject(businessName, research),
     body,
     html,
-    attachments: channel === "email" ? [PROTOTYPE_ATTACHMENT] : [],
+    attachments: channel === "email" && !hotel ? [PROTOTYPE_ATTACHMENT] : [],
     status: "draft",
     createdAt: new Date().toISOString(),
     requiresHumanApproval: true,
+    proposal: { businessType: hotel ? "hotel" : "restaurant", currency: pricing.currency, packagePrice: price },
     personalization: {
-      strategy: researchSignals(research).angle,
+      strategy: hotel ? "hospitality-website" : researchSignals(research).angle,
       researched: Boolean(research.researchedAt || research.notes?.length || research.website)
     }
   };
