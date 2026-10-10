@@ -356,8 +356,17 @@ export function renderControlCentre() {
     return sessionStorage.getItem(TOKEN_KEY) || "";
   }
 
+  let isLoadingAll = false;
+  const pendingActions = new Set();
+
   function setMessage(message) {
     document.getElementById("message").textContent = message;
+  }
+
+  function setActionBusy(key, button, busy) {
+    if (button) button.disabled = busy;
+    if (busy) pendingActions.add(key);
+    else pendingActions.delete(key);
   }
 
   function connect() {
@@ -388,57 +397,48 @@ export function renderControlCentre() {
 
   async function api(path, options = {}) {
     const token = getToken();
-
-    const headers = {
-      ...(options.headers || {}),
-      "Authorization": "Bearer " + token
-    };
-
-    if (options.body) {
-      headers["Content-Type"] = "application/json";
-    }
-
-    const response = await fetch(path, {
-      ...options,
-      headers
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Request failed");
-    }
-
+    const headers = { ...(options.headers || {}), "Authorization": "Bearer " + token };
+    if (options.body) headers["Content-Type"] = "application/json";
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    let response;
+    try {
+      response = await fetch(path, { ...options, headers, signal: controller.signal, cache: "no-store" });
+    } catch (error) {
+      if (error.name === "AbortError") throw new Error("Request timed out after 12 seconds. Check Render logs before retrying.");
+      throw new Error("Network request failed: " + error.message);
+    } finally { clearTimeout(timeout); }
+    const raw = await response.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; }
+    catch { data = { error: raw || "Server returned an unreadable response" }; }
+    if (!response.ok) throw new Error((data.error || "Request failed") + (data.detail ? " — " + data.detail : ""));
     return data;
   }
 
   async function loadAll() {
-    if (!getToken()) {
-      setMessage("Not connected.");
-      return;
-    }
-
+    if (!getToken()) { setMessage("Not connected."); return; }
+    if (isLoadingAll) return;
+    isLoadingAll = true;
     try {
-      const [queueData, approvalData, draftData, metricData] = await Promise.all([
-        api("/control/queue"),
-        api("/control/approvals"),
-        api("/control/pilot/drafts"),
-        api("/control/metrics")
+      const [queueData, approvalData, draftData, metricData, sendingData, activityData] = await Promise.all([
+        api("/control/queue"), api("/control/approvals"), api("/control/pilot/drafts"),
+        api("/control/metrics"), api("/control/send-status"), api("/control/activity")
       ]);
-
-      renderQueue(queueData.queue);
-      renderApprovals(approvalData.approvals);
-      renderDrafts(draftData.drafts);
-      updateStats(queueData.queue, approvalData.approvals);
-      renderMetrics(metricData.metrics);
-
-      setMessage("Control Centre synchronized.");
+      renderQueue(queueData.queue || []);
+      renderApprovals(approvalData.approvals || [], draftData.drafts || []);
+      renderDrafts(draftData.drafts || []);
+      updateStats(queueData.queue || [], approvalData.approvals || [], metricData.metrics || {});
+      renderMetrics(metricData.metrics || {});
+      renderSendingStatus(sendingData.sending || {});
+      renderActivity(activityData.activity || []);
+      setMessage("Synchronized at " + new Date().toLocaleTimeString() + ".");
     } catch (error) {
-      setMessage(error.message);
-    }
+      setMessage("Could not synchronize: " + error.message);
+    } finally { isLoadingAll = false; }
   }
 
-  function updateStats(leads, approvals) {
+  function updateStats(leads, approvals, metrics = {}) {
     document.getElementById("leadCount").textContent =
       leads.length;
 
@@ -452,9 +452,11 @@ export function renderControlCentre() {
       ).length;
 
     document.getElementById("handoffCount").textContent =
-      leads.filter(
-        lead => lead.stage === "human_handoff"
-      ).length;
+      leads.filter(lead => lead.stage === "human_handoff").length;
+    document.getElementById("sentCount").textContent = metrics.sent ?? 0;
+    document.getElementById("deliveredCount").textContent = metrics.delivered ?? 0;
+    document.getElementById("blockedCount").textContent = metrics.blocked ?? 0;
+    document.getElementById("failedCount").textContent = metrics.failed ?? 0;
   }
 
   function renderQueue(leads) {
@@ -493,56 +495,95 @@ export function renderControlCentre() {
     \`).join("");
   }
 
-  function renderApprovals(approvals) {
+  function renderApprovals(approvals, states = []) {
     const container = document.getElementById("approvals");
-
-    if (!approvals.length) {
-      container.textContent = "No outreach approvals.";
-      return;
-    }
-
+    const draftLookup = new Map(states.flatMap(state => (state.drafts || []).map(draft => [
+      draft.id, { draft, lead: state.lead, email: state.lead?.contact?.email || "" }
+    ])));
+    if (!approvals.length) { container.textContent = "No outreach approvals."; return; }
     container.innerHTML = approvals.map(approval => {
       const pending = approval.status === "pending";
-
-      return \`
-        <div class="approval">
-          <strong>
-            Draft: \${escapeHtml(approval.draftId)}
-          </strong>
-
-          <div class="meta">
-            Lead: \${escapeHtml(approval.leadId)}
-          </div>
-
-          <div class="meta">
-            Status: \${escapeHtml(approval.status)}
-          </div>
-
-          \${pending ? \`
-            <div class="approval-actions">
-              <button
-                class="primary"
-                onclick="decideApproval(
-                  '\${encodeURIComponent(approval.draftId)}',
-                  true
-                )">
-                Approve
-              </button>
-
-              <button
-                class="danger"
-                onclick="decideApproval(
-                  '\${encodeURIComponent(approval.draftId)}',
-                  false
-                )">
-                Reject
-              </button>
-            </div>
-          \` : ""}
-        </div>
-      \`;
+      const match = draftLookup.get(approval.draftId) || {};
+      const draft = match.draft || {};
+      const outcome = draft.sendOutcome || {};
+      const sendStatus = outcome.status || (draft.status === "sent" ? "sent" : draft.status || "not attempted");
+      const reason = outcome.reason || "";
+      const subject = draft.subject || "Subject not available";
+      const recipient = match.email || "No recipient address";
+      const badge = '<span class="status-pill ' + escapeHtml(sendStatus) + '">' + escapeHtml(sendStatus) + '</span>';
+      const actions = pending
+        ? '<div class="approval-actions"><button class="primary" onclick="decideApproval(\'' + encodeURIComponent(approval.draftId) + '\',true,this)">Approve & attempt send</button><button class="danger" onclick="decideApproval(\'' + encodeURIComponent(approval.draftId) + '\',false,this)">Reject</button></div>'
+        : (approval.status === "approved" && sendStatus !== "sent"
+          ? '<div class="approval-actions"><button class="primary" onclick="retrySend(\'' + encodeURIComponent(approval.draftId) + '\',this)">Retry send</button></div>'
+          : "");
+      return '<div class="approval"><strong>' + escapeHtml(match.lead?.name || approval.leadId) + '</strong>' +
+        '<div class="meta">Draft: ' + escapeHtml(approval.draftId) + '</div>' +
+        '<div class="meta">To: ' + escapeHtml(recipient) + '</div>' +
+        '<div class="meta">Subject: ' + escapeHtml(subject) + '</div>' +
+        '<div class="meta">Approval: <span class="status-pill ' + escapeHtml(approval.status) + '">' + escapeHtml(approval.status) + '</span> · Send: ' + badge + '</div>' +
+        (reason ? '<div class="meta" style="color:#b91c1c">Reason: ' + escapeHtml(reason) + '</div>' : "") +
+        actions + '</div>';
     }).join("");
   }
+
+  function renderSendingStatus(sending) {
+    const box = document.getElementById("sendStatus");
+    const gates = [
+      "Kill switch: " + (sending.killSwitchOn ? "ON" : "OFF"),
+      "Provider: " + (sending.providerEnabled ? "enabled" : "disabled"),
+      "B2B outreach: " + (sending.b2bOutreachEnabled ? "enabled" : "disabled"),
+      "Test mode: " + (sending.testMode ? "ON" : "OFF"),
+      "Sender domain verified: " + (sending.senderDomainVerified ? "yes" : "no")
+    ];
+    box.className = "status-banner" + (sending.enabled ? " safe" : "");
+    box.innerHTML = "<strong>Live sending " + (sending.enabled ? "READY" : "BLOCKED") + "</strong><div>" +
+      gates.map(escapeHtml).join(" · ") + "</div>" +
+      (sending.reasons && sending.reasons.length
+        ? "<ul>" + sending.reasons.map(reason => "<li>" + escapeHtml(reason) + "</li>").join("") + "</ul>"
+        : "<p>Global gates are open. Per-recipient consent and suppression checks still apply.</p>");
+  }
+
+  async function loadActivity() {
+    try {
+      const data = await api("/control/activity");
+      renderActivity(data.activity || []);
+      setMessage("Activity refreshed at " + new Date().toLocaleTimeString() + ".");
+    } catch (error) { setMessage("Activity refresh failed: " + error.message); }
+  }
+
+  function renderActivity(items) {
+    const container = document.getElementById("activityLog");
+    if (!items.length) { container.textContent = "No send attempts recorded."; return; }
+    container.innerHTML = items.slice(0, 50).map(item => {
+      const payload = item.payload || {};
+      const type = item.type || "unknown";
+      const status = payload.sendStatus || type.replace("outreach.", "");
+      const reason = payload.reason || payload.error || "";
+      return '<div class="activity-row"><div><span class="status-pill ' + escapeHtml(status) + '">' + escapeHtml(status) +
+        '</span><div class="small">' + escapeHtml(item.created_at ? new Date(item.created_at).toLocaleString() : "Time unavailable") +
+        '</div></div><div><strong>' + escapeHtml(payload.subject || payload.leadName || payload.leadId || payload.draftId || type) +
+        '</strong><div class="meta">To: ' + escapeHtml(payload.recipient || "not recorded") +
+        '</div><div class="meta">Event: ' + escapeHtml(type) + '</div>' +
+        (reason ? '<div class="meta" style="color:#b91c1c">Reason: ' + escapeHtml(reason) + '</div>' : '') +
+        '</div></div>';
+    }).join("");
+  }
+
+  async function retrySend(encodedDraftId, button) {
+    const draftId = decodeURIComponent(encodedDraftId);
+    if (button && button.disabled) return;
+    setActionBusy(draftId, button, true);
+    setMessage("Retrying send for " + draftId + "…");
+    try {
+      const result = await api("/control/approvals/" + encodeURIComponent(draftId) + "/send", {
+        method: "POST", body: JSON.stringify({})
+      });
+      setMessage("Send status: " + result.sendOutcome.status + ". " + (result.sendOutcome.reason || ""));
+      await loadAll();
+    } catch (error) { setMessage("Retry failed: " + error.message); }
+    finally { setActionBusy(draftId, button, false); }
+  }
+
 
   async function preparePilot() {
     try {
@@ -667,31 +708,28 @@ export function renderControlCentre() {
     ).join("");
   }
 
-  async function decideApproval(encodedDraftId, approved) {
+  async function decideApproval(encodedDraftId, approved, button) {
     const draftId = decodeURIComponent(encodedDraftId);
-
+    if (button && button.disabled) return;
+    if (approved && !confirm("Approve this draft and attempt delivery? It will only send if the kill switch, provider, consent and compliance gates pass.")) return;
+    setActionBusy(draftId, button, true);
+    setMessage((approved ? "Approving and attempting send: " : "Rejecting: ") + draftId + "…");
     try {
-      const reason = approved
-        ? "Approved by human operator"
-        : "Rejected by human operator";
-
-      await api(
-        "/control/approvals/" +
-        encodeURIComponent(draftId) +
-        "/decide",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            approved,
-            reason
-          })
-        }
-      );
-
+      const result = await api("/control/approvals/" + encodeURIComponent(draftId) + "/decide", {
+        method: "POST",
+        body: JSON.stringify({
+          approved,
+          reason: approved ? "Approved by human operator from Control Centre" : "Rejected by human operator from Control Centre"
+        })
+      });
+      const outcome = result.sendOutcome || {};
+      setMessage(approved
+        ? "Approval recorded. Send status: " + (outcome.status || "unknown") + ". " + (outcome.reason || "")
+        : "Draft rejected; it will not be sent.");
       await loadAll();
     } catch (error) {
-      setMessage(error.message);
-    }
+      setMessage("Action failed for " + draftId + ": " + error.message);
+    } finally { setActionBusy(draftId, button, false); }
   }
 
   async function loadLead(encodedLeadId) {
@@ -769,8 +807,8 @@ export function renderControlCentre() {
 
   // Keep the operational view moving without requiring a manual refresh.
   setInterval(() => {
-    if (getToken()) loadAll();
-  }, 15000);
+    if (getToken() && !isLoadingAll && pendingActions.size === 0) loadAll();
+  }, 20000);
 </script>
 </body>
 </html>`;
