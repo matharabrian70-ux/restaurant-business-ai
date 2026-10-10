@@ -102,12 +102,17 @@ export function renderControlCentre() {
       color: #111827;
     }
 
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 14px;
-      margin-bottom: 18px;
-    }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+    .status-banner { border:1px solid #fed7aa; background:#fff7ed; color:#9a3412; padding:14px 16px; border-radius:12px; margin-bottom:18px; line-height:1.5; }
+    .status-banner.safe { border-color:#bbf7d0; background:#f0fdf4; color:#166534; }
+    .status-pill { display:inline-flex; border-radius:999px; padding:4px 9px; font-size:12px; font-weight:700; background:#e5e7eb; color:#374151; }
+    .status-pill.sent,.status-pill.delivered { background:#dcfce7; color:#166534; }
+    .status-pill.blocked,.status-pill.failed,.status-pill.bounced { background:#fee2e2; color:#991b1b; }
+    .status-pill.approved,.status-pill.pending { background:#fef3c7; color:#92400e; }
+    .activity-row { border-bottom:1px solid #e5e7eb; padding:12px 0; display:grid; grid-template-columns:minmax(120px,.7fr) minmax(0,2fr); gap:10px; }
+    .activity-row:last-child { border-bottom:0; }
+    button:disabled { opacity:.55; cursor:wait; }
+    .small { font-size:12px; color:#667085; }
 
     .funnel {
       display: grid;
@@ -264,29 +269,19 @@ export function renderControlCentre() {
         Approve all pending
       </button>
 
-      <div id="message"></div>
+      <div id="message" role="status" aria-live="polite" aria-atomic="true"></div>
     </section>
 
+    <section class="status-banner" id="sendStatus" role="status" aria-live="polite">Connect to check sending gates.</section>
     <section class="stats">
-      <div class="stat">
-        Leads
-        <strong id="leadCount">0</strong>
-      </div>
-
-      <div class="stat">
-        Pending approvals
-        <strong id="pendingCount">0</strong>
-      </div>
-
-      <div class="stat">
-        High priority
-        <strong id="highCount">0</strong>
-      </div>
-
-      <div class="stat">
-        Human handoffs
-        <strong id="handoffCount">0</strong>
-      </div>
+      <div class="stat">Leads<strong id="leadCount">0</strong></div>
+      <div class="stat">Pending approvals<strong id="pendingCount">0</strong></div>
+      <div class="stat">Sent<strong id="sentCount">0</strong></div>
+      <div class="stat">Delivered<strong id="deliveredCount">0</strong></div>
+      <div class="stat">Blocked<strong id="blockedCount">0</strong></div>
+      <div class="stat">Failed<strong id="failedCount">0</strong></div>
+      <div class="stat">High priority<strong id="highCount">0</strong></div>
+      <div class="stat">Human handoffs<strong id="handoffCount">0</strong></div>
     </section>
 
     <section class="card">
@@ -333,6 +328,14 @@ export function renderControlCentre() {
       <div id="approvals">
         Connect to load approvals.
       </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <h2>Send Activity & Block Reasons</h2>
+        <button class="muted" onclick="loadActivity()">Refresh activity</button>
+      </div>
+      <div id="activityLog">Connect to load send activity.</div>
     </section>
 
     <section class="card">
