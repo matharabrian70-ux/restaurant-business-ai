@@ -4,28 +4,29 @@ import { createOutreachDraft } from "./outreach.js";
 const TEST_RESTAURANT = "Pili Restaurant";
 
 function buildControlledTestContent(env = process.env) {
-  const lead = {
-    id: "CONTROLLED-TEST",
-    name: TEST_RESTAURANT,
-    email: env.SALES_TEST_RECIPIENT
-  };
-
-  const draft = createOutreachDraft({
-    lead,
-    research: {
-      name: TEST_RESTAURANT,
-      notes: [],
-      hasOnlineOrdering: false,
-      deliveryAvailable: true,
-      multipleBranches: false,
-      researchedAt: new Date().toISOString()
-    },
-    channel: "email"
-  });
-
+  // Keep this diagnostic message deliberately simple: no sales pitch, external
+  // links, HTML template, or ZIP attachment. This isolates sender/provider
+  // delivery from content and attachment filtering by recipient mail servers.
+  const recipient = String(env.SALES_TEST_RECIPIENT || "").trim();
   return {
-    ...draft,
-    body: "This is a controlled communication test.\\n\\n" + draft.body
+    id: "CONTROLLED-TEST",
+    leadId: "CONTROLLED-TEST",
+    channel: "email",
+    subject: "Mathara Digital - controlled email delivery test",
+    body: [
+      "Hello,",
+      "",
+      "This is a controlled email delivery test for Mathara Digital.",
+      "It contains no marketing offer, links, or attachments.",
+      "",
+      "If you received this message, please confirm receipt in the test chat.",
+      "",
+      "Regards,",
+      "Mathara Digital"
+    ].join("\\n"),
+    html: "<!doctype html><html><body><p>Hello,</p><p>This is a controlled email delivery test for Mathara Digital.</p><p>It contains no marketing offer, links, or attachments.</p><p>If you received this message, please confirm receipt in the test chat.</p><p>Regards,<br>Mathara Digital</p></body></html>",
+    attachments: [],
+    recipient
   };
 }
 
