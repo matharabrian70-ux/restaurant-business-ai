@@ -53,7 +53,8 @@ export function buildServer(
   const manualSalesRuntime = createManualSalesRuntime({
     controlPlane,
     transport: configuredTransport,
-    suppressionStore: complianceStore.suppressions
+    suppressionStore: complianceStore.suppressions,
+    env
   });
 
   const handleControlRequest = createControlCentreApi({
@@ -405,6 +406,126 @@ export function buildServer(
       } catch (error) {
         res.writeHead(400, {"content-type": "application/json"});
         res.end(JSON.stringify({ error: error.message }));
+      }
+      return;
+    }
+
+
+    if (req.method === "GET" && pathname === "/control/send-status") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ sending: manualSalesRuntime.getSendingStatus() }));
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/control/activity") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+      try {
+        await store.init();
+        const events = await store.listEvents({ limit: 100 });
+        const prepared = manualSalesRuntime.listPreparedDrafts().flatMap((state) =>
+          (state.drafts || []).map((draft) => ({
+            id: "draft:" + draft.id,
+            type: draft.sendOutcome?.status || draft.status || "draft",
+            created_at: draft.sendOutcome?.updatedAt || draft.approvedAt || draft.createdAt || null,
+            payload: {
+              draftId: draft.id,
+              leadId: draft.leadId,
+              recipient: state.lead?.contact?.email || null,
+              subject: draft.subject || "",
+              reason: draft.sendOutcome?.reason || (draft.status === "draft" ? "Awaiting human approval." : "")
+            }
+          }))
+        );
+        await store.close();
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ activity: [...events.map((event) => ({
+          id: event.event_id,
+          type: event.event_type,
+          created_at: event.created_at,
+          payload: event.payload
+        })), ...prepared].sort((a, b) =>
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        ).slice(0, 100) }));
+      } catch (error) {
+        await store.close().catch(() => {});
+        res.writeHead(503, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: "activity_unavailable", detail: error.message }));
+      }
+      return;
+    }
+
+    const approvalActionMatch = req.method === "POST"
+      ? pathname.match(/^\\/control\\/approvals\\/([^/]+)\\/decide$/)
+      : null;
+    if (approvalActionMatch) {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      try {
+        const body = JSON.parse(await readBody(req) || "{}");
+        if (typeof body.approved !== "boolean") throw new Error("approved_boolean_required");
+        const draftId = decodeURIComponent(approvalActionMatch[1]);
+        const decision = manualSalesRuntime.decideDraft(
+          draftId,
+          body.approved,
+          typeof body.reason === "string" ? body.reason.slice(0, 500) : ""
+        );
+        let sendOutcome = decision.sendOutcome;
+        if (body.approved) {
+          sendOutcome = await manualSalesRuntime.sendApprovedDraft({ draftId });
+        }
+        const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+        try {
+          await store.init();
+          const eventType = !body.approved
+            ? "outreach.rejected"
+            : sendOutcome?.status === "sent"
+              ? "outreach.sent"
+              : sendOutcome?.status === "failed"
+                ? "outreach.failed"
+                : sendOutcome?.status === "blocked"
+                  ? "outreach.blocked"
+                  : "outreach.approved";
+          await store.recordEvent(
+            "control-ui:" + draftId + ":" + eventType + ":" + new Date().toISOString(),
+            eventType,
+            {
+              draftId,
+              leadId: decision.approval?.leadId || decision.lead?.id || null,
+              recipient: decision.lead?.contact?.email || null,
+              reason: sendOutcome?.reason || body.reason || "",
+              sendStatus: sendOutcome?.status || (body.approved ? "approved" : "rejected")
+            }
+          );
+        } finally {
+          await store.close();
+        }
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({
+          approval: decision.approval,
+          sendOutcome: sendOutcome || { status: body.approved ? "approved" : "rejected" }
+        }));
+      } catch (error) {
+        res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: error.message || "approval_action_failed" }));
       }
       return;
     }
