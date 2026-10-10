@@ -53,7 +53,9 @@ test("approved mock send only runs after global gates and documented consent are
     SALES_B2B_OUTREACH_ENABLED: "true",
     SALES_PROVIDER_ENABLED: "true",
     SALES_TEST_MODE: "false",
-    RESEND_DOMAIN_VERIFIED: "true"
+    RESEND_DOMAIN_VERIFIED: "true",
+    DATABASE_URL: "postgres://test.invalid/db",
+    RESEND_API_KEY: "re_test"
   });
   runtime.preparePilotBatch({ limit: 1 });
   const state = runtime.listPreparedDrafts()[0];
