@@ -64,7 +64,7 @@ async function fetchPageText(url, origin, fetchImpl = globalThis.fetch) {
   }
 }
 
-async function fetchWebsiteEmail(website, fetchImpl = globalThis.fetch) {
+export async function findPublicBusinessEmail(website, fetchImpl = globalThis.fetch) {
   if (!website) return null;
 
   let base;
@@ -160,7 +160,7 @@ async function enrichWebsiteEmails(records, fetchImpl) {
       const record = enriched[index];
       if (record.email || !record.website) continue;
 
-      const email = await fetchWebsiteEmail(record.website, fetchImpl);
+      const email = await findPublicBusinessEmail(record.website, fetchImpl);
       enriched[index] = {
         ...record,
         email,
