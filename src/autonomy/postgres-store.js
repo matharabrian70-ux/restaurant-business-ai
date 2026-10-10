@@ -88,6 +88,33 @@ export class PostgresAutonomyStore {
     return lead;
   }
 
+  async suppressEmail({ email, reason, source = "provider", at = new Date().toISOString() } = {}) {
+    const normalized = String(email || "").trim().toLowerCase();
+    if (!normalized || !normalized.includes("@")) throw new Error("A valid email address is required for suppression");
+    if (!reason) throw new Error("Suppression reason is required");
+    const key = "suppression:" + normalized;
+    const existing = await this.get(key);
+    const entry = {
+      email: normalized,
+      reason: String(reason),
+      source: String(source),
+      at,
+      firstSuppressedAt: existing?.firstSuppressedAt || at
+    };
+    await this.set(key, entry);
+    return entry;
+  }
+
+  async getSuppression(email) {
+    const normalized = String(email || "").trim().toLowerCase();
+    if (!normalized) return null;
+    return this.get("suppression:" + normalized);
+  }
+
+  async isSuppressed(email) {
+    return Boolean(await this.getSuppression(email));
+  }
+
   async findLeadByEmail(email) {
     const { rows } = await this.pool.query(
       "SELECT * FROM autonomy_leads WHERE LOWER(email)=LOWER($1) LIMIT 1",
