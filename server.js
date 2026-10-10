@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import { createConfiguredTransport } from "./src/sales/provider-factory.js";
-import { sendControlledTestEmail } from "./src/sales/test-send.js";
+import { sendControlledTestEmail, sendControlledProposalEmail } from "./src/sales/test-send.js";
 import { SalesControlPlane } from "./src/sales/control-plane.js";
 import { createControlCentreApi } from "./src/sales/control-centre-api.js";
 import { renderControlCentre } from "./src/sales/control-centre-ui.js";
@@ -562,6 +562,29 @@ export function buildServer(
         }));
       }
 
+      return;
+    }
+
+
+    if (req.method === "POST" && pathname === "/test-proposal-email") {
+      const auth = req.headers.authorization || "";
+      const suppliedToken = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+      if (!tokensMatch(env.SALES_TEST_TOKEN, suppliedToken)) {
+        res.writeHead(401, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      try {
+        const result = await sendControlledProposalEmail({
+          env,
+          transport: configuredTransport
+        });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: error.message }));
+      }
       return;
     }
 
