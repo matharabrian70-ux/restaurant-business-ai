@@ -47,7 +47,7 @@ services:
       - key: AUTONOMOUS_DISCOVERY_PAGE_SIZE
         value: "35"
       - key: AUTONOMOUS_DISCOVERY_DAILY_TARGET
-        value: "35"
+        value: "50"
       - key: AUTONOMOUS_SALES_ENABLED
         value: "true"
       - key: AUTONOMOUS_DAILY_LIMIT
@@ -82,7 +82,7 @@ services:
       - key: AUTONOMOUS_DISCOVERY_PAGE_SIZE
         value: "35"
       - key: AUTONOMOUS_DISCOVERY_DAILY_TARGET
-        value: "35"
+        value: "50"
       - key: AUTONOMOUS_SALES_ENABLED
         value: "true"
       - key: AUTONOMOUS_DAILY_LIMIT
