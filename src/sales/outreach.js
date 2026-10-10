@@ -210,7 +210,7 @@ function buildEmail({ restaurantName, research = {} }) {
   ].join("\n").trim();
 }
 
-function buildHtmlEmail({ restaurantName, research = {} }) {
+function buildHtmlEmail({ restaurantName, research = {}, pricingHtml = "" }) {
   const {
     paragraphs,
     prototypeUrl,
@@ -317,12 +317,10 @@ export function createOutreachDraft({ lead, research = {}, channel = "email" }) 
     ? buildHotelEmail({ businessName, research, price })
     : buildEmail({ restaurantName: businessName, research }) +
       `\n\nPackages (one-time setup):\n1. Website: ${pricing.restaurantWebsite}\n2. Website + Ordering System: ${pricing.restaurantOrdering}\n\nMy portfolio:\n${PORTFOLIO_URL}`;
+  const pricingHtml = `<div style="margin:0 0 16px;padding:16px;background:#f7faf8;border:1px solid #dce9df;border-radius:12px"><strong>Packages (one-time setup)</strong><p>Website: ${escapeHtml(pricing.restaurantWebsite)}</p><p>Website + Ordering System: ${escapeHtml(pricing.restaurantOrdering)}</p></div>`;
   const html = hotel
     ? buildHotelHtml({ businessName, research, price })
-    : buildHtmlEmail({ restaurantName: businessName, research }).replace(
-        "</div>\\n        ${closingHtml}",
-        `<div style="margin:0 0 16px;padding:16px;background:#f7faf8;border:1px solid #dce9df;border-radius:12px"><strong>Packages (one-time setup)</strong><p>Website: ${escapeHtml(pricing.restaurantWebsite)}</p><p>Website + Ordering System: ${escapeHtml(pricing.restaurantOrdering)}</p></div></div>\\n        ${closingHtml}`
-      );
+    : buildHtmlEmail({ restaurantName: businessName, research, pricingHtml });
 
   return {
     id: `OUT-${lead.id}-${channel}`,
