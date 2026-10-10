@@ -514,7 +514,7 @@ export function renderControlCentre() {
       const actions = pending
         ? '<div class="approval-actions"><button class="primary" onclick="decideApproval(\'' + encodeURIComponent(approval.draftId) + '\',true,this)">Approve & attempt send</button><button class="danger" onclick="decideApproval(\'' + encodeURIComponent(approval.draftId) + '\',false,this)">Reject</button></div>'
         : (approval.status === "approved" && sendStatus !== "sent"
-          ? '<div class="approval-actions"><button class="primary" onclick="retrySend(\'' + encodeURIComponent(approval.draftId) + '\',this)">Retry send</button></div>'
+          ? '<div class="approval-actions"><button class="primary" onclick="retrySend(\\'' + encodeURIComponent(approval.draftId) + '\\',this)">Retry send</button></div>'
           : "");
       return '<div class="approval"><strong>' + escapeHtml(match.lead?.name || approval.leadId) + '</strong>' +
         '<div class="meta">Draft: ' + escapeHtml(approval.draftId) + '</div>' +
