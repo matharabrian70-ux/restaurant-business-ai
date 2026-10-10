@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   sendControlledTestEmail,
+  sendControlledProposalEmail,
   validateControlledTestConfig,
   buildControlledTestIdempotencyKey
 } from "../src/sales/test-send.js";
@@ -81,4 +82,37 @@ test("controlled test cannot run while provider is disabled", async () => {
     }),
     /SALES_PROVIDER_ENABLED/
   );
+});
+
+test("controlled Pili proposal test preserves proposal HTML and links but removes ZIP attachment", async () => {
+  let message;
+  const env = {
+    SALES_TEST_MODE: "true",
+    SALES_PROVIDER_ENABLED: "true",
+    SALES_TEST_RECIPIENT: "owner@example.com",
+    SALES_TEST_TOKEN: "test-secret",
+    RESEND_FROM: "Brian Mathara <hello@matharadigital.dev>"
+  };
+
+  const result = await sendControlledProposalEmail({
+    env,
+    transport: {
+      send: async (payload) => {
+        message = payload;
+        return { provider: "resend", status: "sent", messageId: "proposal-test-id" };
+      }
+    }
+  });
+
+  assert.equal(result.test, true);
+  assert.equal(result.template, "pili_restaurant_proposal");
+  assert.equal(message.recipient, "owner@example.com");
+  assert.match(message.subject, /Pili Restaurant/i);
+  assert.match(message.html, /A digital ordering idea for Pili Restaurant/i);
+  assert.match(message.html, /Restaurant Prototype/i);
+  assert.match(message.html, /Customer Menu/i);
+  assert.match(message.html, /US\$230/);
+  assert.match(message.html, /US\$615/);
+  assert.deepEqual(message.attachments, []);
+  assert.match(message.html, /https:\/\/matharabrian70-ux\.github\.io\/Restaurant-Website-Prototype\//);
 });
