@@ -733,7 +733,7 @@ export function renderControlCentre() {
       return;
     }
     const consentDate = prompt("Enter the actual opt-in date in YYYY-MM-DD format. Do not use today unless that is when the recipient opted in.");
-    if (!consentDate || !/^\\d{4}-\\d{2}-\\d{2}$/.test(consentDate.trim()) || Number.isNaN(Date.parse(consentDate.trim() + "T12:00:00Z"))) {
+    if (!consentDate || !/^\d{4}-\d{2}-\d{2}$/.test(consentDate.trim()) || Number.isNaN(Date.parse(consentDate.trim() + "T12:00:00Z"))) {
       setMessage("Opt-in evidence not recorded. Enter a valid YYYY-MM-DD consent date.");
       return;
     }
