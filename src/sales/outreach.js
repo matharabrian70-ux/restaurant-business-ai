@@ -286,6 +286,7 @@ function buildHtmlEmail({ restaurantName, research = {}, pricingHtml = "" }) {
             </div>
           </div>
         </div>
+        ${pricingHtml}
         ${closingHtml}
       </div>
     </div>
