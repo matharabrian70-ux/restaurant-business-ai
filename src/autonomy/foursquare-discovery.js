@@ -131,50 +131,30 @@ export async function findPublicBusinessEmail(website, fetchImpl = globalThis.fe
   base.hash = "";
   base.search = "";
   const homepageUrl = base.toString();
-  const knownPaths = [
-    "/", "/contact", "/contact-us", "/contact.html", "/contact.php",
-    "/about", "/about-us", "/reservations", "/booking", "/pages/contact",
-    "/pages/contact-us", "/en/contact", "/enquiry", "/enquiries", "/impressum"
-  ];
-  const candidates = [...new Set([
-    homepageUrl,
-    ...knownPaths.map((path) => new URL(path, base.origin).toString())
-  ])].slice(0, 16);
-
-  // Scan the homepage first so linked contact pages can be discovered. Keep
-  // every request on the original origin and cap concurrency and total pages.
   const homepage = await fetchPageText(homepageUrl, base.origin, fetchImpl);
   if (homepage) {
     const email = extractBusinessEmail(homepage);
     if (email) return email;
-    for (const link of contactLinksFromHtml(homepage, base)) {
-      if (!candidates.includes(link) && candidates.length < 20) candidates.push(link);
-    }
   }
 
-  let nextIndex = 0;
-  let found = null;
-  async function worker() {
-    while (!found) {
-      const index = nextIndex++;
-      if (index >= candidates.length) return;
-      const url = candidates[index];
-      if (url === homepageUrl) continue;
-      const html = await fetchPageText(url, base.origin, fetchImpl);
-      if (!html) continue;
-      const email = extractBusinessEmail(html);
-      if (email) {
-        found = email;
-        return;
-      }
-      for (const link of contactLinksFromHtml(html, base)) {
-        if (!candidates.includes(link) && candidates.length < 20) candidates.push(link);
-      }
-    }
-  }
+  // Keep requests bounded: inspect the homepage and at most two additional
+  // same-origin contact pages, prioritizing links actually published by the site.
+  const linkedPages = homepage ? contactLinksFromHtml(homepage, base) : [];
+  const fallbackPages = [
+    "/contact", "/contact-us", "/about", "/reservations", "/booking",
+    "/contact.html", "/about-us", "/enquiries", "/pages/contact"
+  ].map((path) => new URL(path, base.origin).toString());
+  const candidates = [...new Set([...linkedPages, ...fallbackPages])]
+    .filter((url) => url !== homepageUrl)
+    .slice(0, 2);
 
-  await Promise.all(Array.from({ length: 4 }, () => worker()));
-  return found;
+  for (const url of candidates) {
+    const html = await fetchPageText(url, base.origin, fetchImpl);
+    if (!html) continue;
+    const email = extractBusinessEmail(html);
+    if (email) return email;
+  }
+  return null;
 }
 
 async function fetchFoursquareSearch({
