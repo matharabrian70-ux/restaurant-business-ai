@@ -512,9 +512,9 @@ export function renderControlCentre() {
       const recipient = match.email || "No recipient address";
       const badge = '<span class="status-pill ' + escapeHtml(sendStatus) + '">' + escapeHtml(sendStatus) + '</span>';
       const actions = pending
-        ? '<div class="approval-actions"><button class="primary" onclick="decideApproval(\'' + encodeURIComponent(approval.draftId) + '\',true,this)">Approve & attempt send</button><button class="danger" onclick="decideApproval(\'' + encodeURIComponent(approval.draftId) + '\',false,this)">Reject</button></div>'
+        ? '<div class="approval-actions"><button class="primary" onclick="decideApproval(\\'' + encodeURIComponent(approval.draftId) + '\\',true,this)">Approve & attempt send</button><button class="danger" onclick="decideApproval(\\'' + encodeURIComponent(approval.draftId) + '\\',false,this)">Reject</button></div>'
         : (approval.status === "approved" && sendStatus !== "sent"
-          ? '<div class="approval-actions"><button class="primary" onclick="retrySend(\\'' + encodeURIComponent(approval.draftId) + '\\',this)">Retry send</button></div>'
+          ? '<div class="approval-actions"><button class="primary" onclick="retrySend(\\\'' + encodeURIComponent(approval.draftId) + '\\\',this)">Retry send</button></div>'
           : "");
       return '<div class="approval"><strong>' + escapeHtml(match.lead?.name || approval.leadId) + '</strong>' +
         '<div class="meta">Draft: ' + escapeHtml(approval.draftId) + '</div>' +
@@ -702,7 +702,7 @@ export function renderControlCentre() {
         '<div class="meta">Consent: ' + escapeHtml(consentStatus) + '</div>' +
         (sendOutcome.reason ? '<div class="meta" style="color:#b91c1c">Last send result: ' + escapeHtml(sendOutcome.status) + ' — ' + escapeHtml(sendOutcome.reason) + '</div>' : '') +
         '<div class="actions" style="margin-top:10px">' +
-          (!draft.consentRecord && draft.pilotId ? '<button class="muted" onclick="recordConsent(\'' + encodeURIComponent(draft.pilotId) + '\',this)">Record documented consent…</button>' : '') +
+          (!draft.consentRecord && draft.pilotId ? '<button class="muted" onclick="recordConsent(\\'' + encodeURIComponent(draft.pilotId) + '\\',this)">Record documented consent…</button>' : '') +
         '</div>' +
         '<details style="margin-top:10px"><summary>Preview email</summary>' +
           '<pre style="white-space:pre-wrap;font:inherit;line-height:1.5;margin-top:10px">' + escapeHtml(draft.body) + '</pre>' +
