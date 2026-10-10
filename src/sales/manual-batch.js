@@ -11,7 +11,8 @@ export function createManualSalesRuntime({
   controlPlane,
   transport,
   suppressionStore,
-  clock
+  clock,
+  env = process.env
 } = {}) {
   const pipeline = new EndToEndSalesPipeline({
     controlPlane,
@@ -22,6 +23,7 @@ export function createManualSalesRuntime({
 
   const preparedLeadIds = new Set();
   const consentOverrides = new Map();
+  const sendOutcomes = new Map();
 
   function preparePilotBatch({ limit = 25 } = {}) {
     if (!Number.isInteger(limit) || limit < 1 || limit > PILOT_PROSPECTS.length) {
@@ -95,7 +97,112 @@ export function createManualSalesRuntime({
         return state ? { ...state, pilotRecord: record } : null;
       })
       .filter(Boolean)
-      .map(clone);
+      .map((state) => {
+        const copy = clone(state);
+        copy.drafts = (copy.drafts || []).map((draft) => ({
+          ...draft,
+          sendOutcome: sendOutcomes.get(draft.id) || null
+        }));
+        return copy;
+      });
+  }
+
+  function findDraftState(draftId) {
+    for (const state of listPreparedDrafts()) {
+      const draft = (state.drafts || []).find((item) => item.id === draftId);
+      if (draft) return { state, draft };
+    }
+    throw new Error("Outreach draft not found: " + draftId);
+  }
+
+  function decideDraft(draftId, approved, reason = "") {
+    const { state, draft } = findDraftState(draftId);
+    if (draft.status !== "draft") throw new Error("Draft is already " + draft.status);
+    const result = approved
+      ? pipeline.approveOutreach(draftId, { reason: reason || "Approved by human operator" })
+      : pipeline.rejectOutreach(draftId, { reason: reason || "Rejected by human operator" });
+    sendOutcomes.set(draftId, approved
+      ? { status: "approved", reason: "Human approval recorded; sending will be attempted if all safety gates pass.", updatedAt: new Date().toISOString() }
+      : { status: "rejected", reason: reason || "Rejected by human operator", updatedAt: new Date().toISOString() });
+    return { ...result, lead: state.lead, sendOutcome: sendOutcomes.get(draftId) };
+  }
+
+  function sendGateReasons() {
+    const reasons = [];
+    if (env.SALES_SEND_KILL_SWITCH !== "false") reasons.push("Sending kill switch is ON (SALES_SEND_KILL_SWITCH must be explicitly set to false).");
+    if (env.SALES_B2B_OUTREACH_ENABLED !== "true") reasons.push("B2B outreach is disabled (SALES_B2B_OUTREACH_ENABLED is not true).");
+    if (env.SALES_PROVIDER_ENABLED !== "true") reasons.push("Email provider sending is disabled (SALES_PROVIDER_ENABLED is not true).");
+    if (env.SALES_TEST_MODE === "true") reasons.push("Test mode is enabled; real prospect sending is blocked.");
+    if (env.RESEND_DOMAIN_VERIFIED !== "true") reasons.push("Sender domain verification is not confirmed.");
+    return reasons;
+  }
+
+  async function sendApprovedDraft({ draftId, sender } = {}) {
+    const { state, draft } = findDraftState(draftId);
+    if (draft.status !== "approved") {
+      const outcome = { status: "blocked", reason: "Draft must be approved before sending.", updatedAt: new Date().toISOString() };
+      sendOutcomes.set(draftId, outcome);
+      return { draftId, ...outcome };
+    }
+    const gateReasons = sendGateReasons();
+    if (gateReasons.length) {
+      const outcome = { status: "blocked", reason: gateReasons.join(" "), reasons: gateReasons, updatedAt: new Date().toISOString() };
+      sendOutcomes.set(draftId, outcome);
+      return { draftId, ...outcome };
+    }
+    const record = state.pilotRecord;
+    const consent = consentOverrides.get(record.id);
+    if (!consent || consent.state !== "allowed" || !consent.source) {
+      const outcome = { status: "blocked", reason: "Recipient consent evidence is missing. Record the lawful basis/evidence before sending.", updatedAt: new Date().toISOString() };
+      sendOutcomes.set(draftId, outcome);
+      return { draftId, ...outcome };
+    }
+    try {
+      const result = await pipeline.sendApprovedOutreach({
+        draftId,
+        recipientAddress: state.lead.contact?.email,
+        sender: sender || {
+          address: env.RESEND_FROM,
+          replyTo: env.RESEND_REPLY_TO || env.RESEND_FROM,
+          verified: env.RESEND_DOMAIN_VERIFIED === "true"
+        },
+        policy: {
+          allowedChannels: ["email"],
+          requireConsent: true,
+          requireUnsubscribeMechanism: true,
+          hasUnsubscribeMechanism: true
+        },
+        consent: "allowed",
+        consentEvidence: consent,
+        directMarketingPolicy: createDirectMarketingPolicy()
+      });
+      const outcome = {
+        status: "sent",
+        reason: "Provider accepted the approved message.",
+        messageId: result.record?.result?.messageId || null,
+        provider: result.record?.result?.provider || null,
+        updatedAt: new Date().toISOString()
+      };
+      sendOutcomes.set(draftId, outcome);
+      return { draftId, ...outcome, result };
+    } catch (error) {
+      const outcome = { status: "failed", reason: error.message || "Unknown send failure", updatedAt: new Date().toISOString() };
+      sendOutcomes.set(draftId, outcome);
+      return { draftId, ...outcome };
+    }
+  }
+
+  function getSendingStatus() {
+    const reasons = sendGateReasons();
+    return {
+      enabled: reasons.length === 0,
+      killSwitchOn: env.SALES_SEND_KILL_SWITCH !== "false",
+      providerEnabled: env.SALES_PROVIDER_ENABLED === "true",
+      b2bOutreachEnabled: env.SALES_B2B_OUTREACH_ENABLED === "true",
+      testMode: env.SALES_TEST_MODE === "true",
+      senderDomainVerified: env.RESEND_DOMAIN_VERIFIED === "true",
+      reasons
+    };
   }
 
   function recordRecipientConsent({ id, source, at = new Date().toISOString() } = {}) {
@@ -179,6 +286,9 @@ export function createManualSalesRuntime({
     preparePilotBatch,
     listPreparedDrafts,
     recordRecipientConsent,
+    decideDraft,
+    sendApprovedDraft,
+    getSendingStatus,
     sendApprovedBatch
   };
 }
