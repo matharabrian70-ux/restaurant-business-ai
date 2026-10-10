@@ -29,12 +29,73 @@ function formatLocation(location) {
   );
 }
 
+function decodeEmailText(value) {
+  return String(value ?? "")
+    .replace(/&#64;|&#x40;|&commat;/gi, "@")
+    .replace(/&#46;|&#x2e;|&period;/gi, ".")
+    .replace(/\s*(?:\[at\]|\(at\)|\{at\})\s*/gi, "@")
+    .replace(/\s+(?:at)\s+/gi, "@")
+    .replace(/\s*(?:\[dot\]|\(dot\)|\{dot\})\s*/gi, ".")
+    .replace(/\s+(?:dot)\s+/gi, ".");
+}
+
 function extractBusinessEmail(html) {
-  const matches = html.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [];
-  const generic = matches.find((email) =>
-    /^(info|hello|contact|reservations|booking|bookings|orders|sales|admin|office|enquiries|enquiry)@/i.test(email)
+  const source = decodeEmailText(html)
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ");
+  const candidates = [
+    ...[...source.matchAll(/mailto:\s*([^"'? >]+)/gi)].map((match) => match[1]),
+    ...(source.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) ?? [])
+  ];
+  const blocked = /^(?:noreply|no-reply|donotreply|do-not-reply|example|test)@/i;
+  const emails = [...new Set(candidates.map(normalizeEmail).filter(Boolean))]
+    .filter((email) => !blocked.test(email) && !/\.(?:png|jpe?g|gif|svg|webp|css|js)$/i.test(email));
+  const generic = emails.find((email) =>
+    /^(info|hello|contact|reservations|booking|bookings|orders|sales|admin|office|enquiries|enquiry|reception|frontdesk|events|stay)@/i.test(email)
   );
-  return normalizeEmail(generic ?? matches[0]);
+  return generic ?? emails[0] ?? null;
+}
+
+function isSafePublicWebsite(website) {
+  let url;
+  try {
+    url = new URL(website);
+  } catch {
+    return false;
+  }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+  if (/^(?:0|10|127|169\.254|192\.168)\./.test(host)) return false;
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const octets = ipv4.slice(1).map(Number);
+    if (octets.some((n) => n > 255) || octets[0] === 0 || octets[0] === 10 || octets[0] === 127 ||
+        (octets[0] === 169 && octets[1] === 254) ||
+        (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+        (octets[0] === 192 && octets[1] === 168)) return false;
+  }
+  return true;
+}
+
+function contactLinksFromHtml(html, base) {
+  const links = [];
+  const hrefPattern = /href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi;
+  for (const match of html.matchAll(hrefPattern)) {
+    const href = match[1] ?? match[2] ?? match[3] ?? "";
+    if (!/(contact|about|reservation|booking|enquir|impressum|reach-us|visit-us)/i.test(href)) continue;
+    try {
+      const url = new URL(href.replace(/&amp;/gi, "&"), base);
+      if (url.origin === base.origin && ["http:", "https:"].includes(url.protocol)) {
+        url.hash = "";
+        links.push(url.toString());
+      }
+    } catch {
+      // Ignore malformed links on third-party websites.
+    }
+  }
+  return links;
 }
 
 async function fetchPageText(url, origin, fetchImpl = globalThis.fetch) {
@@ -50,10 +111,9 @@ async function fetchPageText(url, origin, fetchImpl = globalThis.fetch) {
 
     if (!response.ok) return null;
 
-    // Do not extract contact details from a redirect to an unrelated domain.
     if (response.url) {
       const finalUrl = new URL(response.url);
-      if (finalUrl.origin !== origin) return null;
+      if (finalUrl.origin !== origin || !isSafePublicWebsite(response.url)) return null;
     }
 
     return await response.text();
@@ -65,28 +125,56 @@ async function fetchPageText(url, origin, fetchImpl = globalThis.fetch) {
 }
 
 export async function findPublicBusinessEmail(website, fetchImpl = globalThis.fetch) {
-  if (!website) return null;
+  if (!website || !isSafePublicWebsite(website)) return null;
 
-  let base;
-  try {
-    base = new URL(website);
-    if (!["http:", "https:"].includes(base.protocol)) return null;
-    if (base.username || base.password) return null;
-  } catch {
-    return null;
-  }
+  const base = new URL(website);
+  base.hash = "";
+  base.search = "";
+  const homepageUrl = base.toString();
+  const knownPaths = [
+    "/", "/contact", "/contact-us", "/contact.html", "/contact.php",
+    "/about", "/about-us", "/reservations", "/booking", "/pages/contact",
+    "/pages/contact-us", "/en/contact", "/enquiry", "/enquiries", "/impressum"
+  ];
+  const candidates = [...new Set([
+    homepageUrl,
+    ...knownPaths.map((path) => new URL(path, base.origin).toString())
+  ])].slice(0, 16);
 
-  // Check the homepage first, then a small bounded set of conventional contact
-  // pages. No external email-finder service or paid API is used.
-  const paths = ["", "/contact", "/contact-us", "/about", "/reservations"];
-  const candidates = paths.map((path) => new URL(path, base.origin).toString());
-  for (const url of [...new Set(candidates)]) {
-    const html = await fetchPageText(url, base.origin, fetchImpl);
-    if (!html) continue;
-    const email = extractBusinessEmail(html);
+  // Scan the homepage first so linked contact pages can be discovered. Keep
+  // every request on the original origin and cap concurrency and total pages.
+  const homepage = await fetchPageText(homepageUrl, base.origin, fetchImpl);
+  if (homepage) {
+    const email = extractBusinessEmail(homepage);
     if (email) return email;
+    for (const link of contactLinksFromHtml(homepage, base)) {
+      if (!candidates.includes(link) && candidates.length < 20) candidates.push(link);
+    }
   }
-  return null;
+
+  let nextIndex = 0;
+  let found = null;
+  async function worker() {
+    while (!found) {
+      const index = nextIndex++;
+      if (index >= candidates.length) return;
+      const url = candidates[index];
+      if (url === homepageUrl) continue;
+      const html = await fetchPageText(url, base.origin, fetchImpl);
+      if (!html) continue;
+      const email = extractBusinessEmail(html);
+      if (email) {
+        found = email;
+        return;
+      }
+      for (const link of contactLinksFromHtml(html, base)) {
+        if (!candidates.includes(link) && candidates.length < 20) candidates.push(link);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: 4 }, () => worker()));
+  return found;
 }
 
 async function fetchFoursquareSearch({
