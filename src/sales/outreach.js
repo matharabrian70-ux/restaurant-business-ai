@@ -128,7 +128,7 @@ function buildMessageParts({ restaurantName, research = {} }) {
 
   const opening = firstNote
     ? `I took a look at ${restaurantName} before reaching out. ${firstNote}`
-    : `I took a look at ${restaurantName} before reaching out and wanted to share a practical idea rather than send you a generic sales email.`;
+    : `I wanted to share a practical idea for ${restaurantName} rather than send a generic sales email.`;
 
   const solutionByAngle = {
     optimization:
@@ -189,7 +189,7 @@ function buildEmail({ restaurantName, research = {} }) {
     paragraphs[0],
     "",
     ...paragraphs.slice(1, 4).flatMap((paragraph) => [paragraph, ""]),
-    "Explore the working restaurant experience below. Use any of the green links to open the website pages:",
+    "Explore these restaurant website and ordering examples:",
     "",
     "This is the Website Prototype:",
     prototypeUrl,
@@ -245,7 +245,7 @@ function buildHtmlEmail({ restaurantName, research = {}, pricingHtml = "" }) {
         <div style="margin:8px 0 28px;padding:20px;background:#f7faf8;border:1px solid #dce9df;border-radius:12px;">
           <div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#172033;">See the working prototype</div>
           <div style="font-size:14px;line-height:1.5;color:#5b6575;margin-bottom:16px;">
-            Open the live prototype or use the attached prototype package to explore it locally.
+            Open the live prototype and explore the example pages.
           </div>
           <div style="font-size:14px;line-height:1.5;color:#5b6575;margin-bottom:18px;">
             The website prototype is the first thing to explore. Use any of the green buttons below to open the website pages.
