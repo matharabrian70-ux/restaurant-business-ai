@@ -721,23 +721,34 @@ export function renderControlCentre() {
   async function recordConsent(encodedPilotId, button) {
     const id = decodeURIComponent(encodedPilotId);
     if (button && button.disabled) return;
-    const source = prompt("Enter a specific evidence reference for the recipient's actual affirmative marketing opt-in (for example, a dated form submission ID or dated written request). A public website listing, published email address, or your own notes are not consent.");
+    const evidenceType = prompt("Evidence type: enter form_submission, written_request, contract_opt_in, or other_reviewable_record.");
+    const allowedTypes = ["form_submission", "written_request", "contract_opt_in", "other_reviewable_record"];
+    if (!allowedTypes.includes((evidenceType || "").trim())) {
+      setMessage("Opt-in evidence not recorded. Choose a supported evidence type.");
+      return;
+    }
+    const source = prompt("Enter a specific reference to genuine, reviewable evidence of affirmative marketing opt-in (for example, a dated form submission ID or written request). Public listings, published email addresses, and your own notes are not consent.");
     if (!source || source.trim().length < 12) {
       setMessage("Opt-in evidence not recorded. A verifiable evidence reference of at least 12 characters is required.");
       return;
     }
-    if (!confirm("Confirm that this reference points to genuine, reviewable evidence that this recipient agreed to receive marketing email. Do not continue if you cannot verify it.")) {
+    const consentDate = prompt("Enter the actual opt-in date in YYYY-MM-DD format. Do not use today unless that is when the recipient opted in.");
+    if (!consentDate || !/^\\d{4}-\\d{2}-\\d{2}$/.test(consentDate.trim()) || Number.isNaN(Date.parse(consentDate.trim() + "T12:00:00Z"))) {
+      setMessage("Opt-in evidence not recorded. Enter a valid YYYY-MM-DD consent date.");
+      return;
+    }
+    if (!confirm("Confirm this evidence genuinely shows that this recipient affirmatively agreed to receive marketing email, and that the date and reference are accurate. Do not continue if you cannot verify it.")) {
       setMessage("Cancelled. No opt-in evidence was recorded.");
       return;
     }
     setActionBusy("consent:" + id, button, true);
-    setMessage("Recording consent evidence for " + id + "…");
+    setMessage("Validating and recording opt-in evidence for " + id + "…");
     try {
       const result = await api("/control/pilot/consent", {
         method: "POST",
-        body: JSON.stringify({ id, source: source.trim(), at: new Date().toISOString() })
+        body: JSON.stringify({ id, source: source.trim(), evidenceType: evidenceType.trim(), consentedAt: new Date(consentDate.trim() + "T12:00:00Z").toISOString(), confirmed: true, at: new Date().toISOString() })
       });
-      setMessage("Opt-in evidence reference recorded for " + result.email + ". Verify it is genuine; recording it does not send email or override other safety gates.");
+      setMessage("Opt-in evidence reference recorded for " + result.email + ". The server validated the evidence fields; verify the reference is genuine. Recording it does not send email or override other safety gates.");
       await loadAll();
     } catch (error) {
       setMessage("Consent could not be recorded: " + error.message);
