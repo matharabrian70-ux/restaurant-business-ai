@@ -37,26 +37,56 @@ function extractBusinessEmail(html) {
   return normalizeEmail(generic ?? matches[0]);
 }
 
-async function fetchWebsiteEmail(website, fetchImpl = globalThis.fetch) {
-  if (!website) return null;
-
+async function fetchPageText(url, origin, fetchImpl = globalThis.fetch) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), WEBSITE_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetchImpl(website, {
+    const response = await fetchImpl(url, {
       signal: controller.signal,
+      redirect: "follow",
       headers: { "user-agent": "Mathara-Digital-Sales-Bot/1.0" }
     });
 
     if (!response.ok) return null;
 
-    return extractBusinessEmail(await response.text());
+    // Do not extract contact details from a redirect to an unrelated domain.
+    if (response.url) {
+      const finalUrl = new URL(response.url);
+      if (finalUrl.origin !== origin) return null;
+    }
+
+    return await response.text();
   } catch {
     return null;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchWebsiteEmail(website, fetchImpl = globalThis.fetch) {
+  if (!website) return null;
+
+  let base;
+  try {
+    base = new URL(website);
+    if (!["http:", "https:"].includes(base.protocol)) return null;
+    if (base.username || base.password) return null;
+  } catch {
+    return null;
+  }
+
+  // Check the homepage first, then a small bounded set of conventional contact
+  // pages. No external email-finder service or paid API is used.
+  const paths = ["", "/contact", "/contact-us", "/about", "/reservations"];
+  const candidates = paths.map((path) => new URL(path, base.origin).toString());
+  for (const url of [...new Set(candidates)]) {
+    const html = await fetchPageText(url, base.origin, fetchImpl);
+    if (!html) continue;
+    const email = extractBusinessEmail(html);
+    if (email) return email;
+  }
+  return null;
 }
 
 async function fetchFoursquareSearch({
