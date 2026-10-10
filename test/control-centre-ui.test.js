@@ -16,7 +16,7 @@ test("Control Centre browser script parses and exposes actionable delivery diagn
     'id="blockedCount"',
     'Approve & attempt send',
     'Retry send',
-    'Record documented consent',
+    'Record verified opt-in evidence',
     '/control/send-status',
     '/control/activity',
     'PAUSE ALL SENDS',
