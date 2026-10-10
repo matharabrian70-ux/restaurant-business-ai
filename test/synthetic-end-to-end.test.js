@@ -78,10 +78,11 @@ test("synthetic lead completes discovery-to-mock-send-to-positive-handoff withou
   assert.equal(result.record.result.provider, "mock");
   assert.equal(cp.getLead(added.lead.id).stage, "contacted");
 
-  const replyResult = pipeline.recordResponse(added.lead.id, {
-    subject: "Re: website idea",
-    body: "Interested, please send me a demo and pricing."
-  });
+  const replyResult = pipeline.recordResponse(
+    added.lead.id,
+    "Interested, please send demo and pricing.",
+    ["requested_demo", "pricing_question"]
+  );
   assert.equal(replyResult.decision.classification, "positive");
   assert.ok(["human_handoff", "qualified"].includes(replyResult.lead.stage));
 
