@@ -62,7 +62,10 @@ test("approved mock send only runs after global gates and documented consent are
   const draft = state.drafts[0];
   runtime.recordRecipientConsent({
     id: state.pilotRecord.id,
-    source: "synthetic fixture evidence",
+    source: "synthetic fixture evidence reference",
+    evidenceType: "form_submission",
+    consentedAt: "2026-10-09T00:00:00.000Z",
+    confirmed: true,
     at: "2026-10-10T00:00:00.000Z"
   });
   runtime.setUiKillSwitchOn(false);

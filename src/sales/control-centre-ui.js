@@ -694,18 +694,22 @@ export function renderControlCentre() {
     if (!drafts.length) { container.textContent = "No personalized drafts prepared yet."; return; }
     container.innerHTML = drafts.map(draft => {
       const consentStatus = draft.consentRecord
-        ? "Evidence recorded: " + draft.consentRecord.source
-        : "No documented consent evidence recorded";
+        ? "Verified opt-in evidence recorded: " + draft.consentRecord.source
+        : "RESEARCH ONLY — no verified marketing opt-in recorded";
+      const eligibility = draft.consentRecord
+        ? '<div class="meta" style="color:#166534">Eligibility: opt-in evidence recorded; all sending, suppression and compliance checks still apply.</div>'
+        : '<div class="meta" style="color:#9a3412">Eligibility: not eligible for marketing email yet. A public business listing or published email address is not consent.</div>';
       const sendOutcome = draft.sendOutcome || {};
       return '<div class="approval">' +
         '<strong>' + escapeHtml(draft.restaurant) + '</strong>' +
         '<div class="meta">To: ' + escapeHtml(draft.email) + '</div>' +
         '<div class="meta">Subject: ' + escapeHtml(draft.subject) + '</div>' +
         '<div class="meta">Draft status: ' + escapeHtml(draft.status) + '</div>' +
-        '<div class="meta">Consent: ' + escapeHtml(consentStatus) + '</div>' +
+        '<div class="meta">Recipient status: ' + escapeHtml(consentStatus) + '</div>' +
+        eligibility +
         (sendOutcome.reason ? '<div class="meta" style="color:#b91c1c">Last send result: ' + escapeHtml(sendOutcome.status) + ' — ' + escapeHtml(sendOutcome.reason) + '</div>' : '') +
         '<div class="actions" style="margin-top:10px">' +
-          (!draft.consentRecord && draft.pilotId ? '<button class="muted" onclick="recordConsent(\\'' + encodeURIComponent(draft.pilotId) + '\\',this)">Record documented consent…</button>' : '') +
+          (!draft.consentRecord && draft.pilotId ? '<button class="muted" onclick="recordConsent(\\'' + encodeURIComponent(draft.pilotId) + '\\',this)">Record verified opt-in evidence…</button>' : '') +
         '</div>' +
         '<details style="margin-top:10px"><summary>Preview email</summary>' +
           '<pre style="white-space:pre-wrap;font:inherit;line-height:1.5;margin-top:10px">' + escapeHtml(draft.body) + '</pre>' +
@@ -717,19 +721,34 @@ export function renderControlCentre() {
   async function recordConsent(encodedPilotId, button) {
     const id = decodeURIComponent(encodedPilotId);
     if (button && button.disabled) return;
-    const source = prompt("Enter the specific, verifiable evidence that this recipient agreed to receive marketing email (for example, a recorded opt-in form or written request). A public website listing or published email address is not consent.");
+    const evidenceType = prompt("Evidence type: enter form_submission, written_request, contract_opt_in, or other_reviewable_record.");
+    const allowedTypes = ["form_submission", "written_request", "contract_opt_in", "other_reviewable_record"];
+    if (!allowedTypes.includes((evidenceType || "").trim())) {
+      setMessage("Opt-in evidence not recorded. Choose a supported evidence type.");
+      return;
+    }
+    const source = prompt("Enter a specific reference to genuine, reviewable evidence of affirmative marketing opt-in (for example, a dated form submission ID or written request). Public listings, published email addresses, and your own notes are not consent.");
     if (!source || source.trim().length < 12) {
-      setMessage("Consent not recorded. A specific evidence source of at least 12 characters is required.");
+      setMessage("Opt-in evidence not recorded. A verifiable evidence reference of at least 12 characters is required.");
+      return;
+    }
+    const consentDate = prompt("Enter the actual opt-in date in YYYY-MM-DD format. Do not use today unless that is when the recipient opted in.");
+    if (!consentDate || !/^\d{4}-\d{2}-\d{2}$/.test(consentDate.trim()) || Number.isNaN(Date.parse(consentDate.trim() + "T12:00:00Z"))) {
+      setMessage("Opt-in evidence not recorded. Enter a valid YYYY-MM-DD consent date.");
+      return;
+    }
+    if (!confirm("Confirm this evidence genuinely shows that this recipient affirmatively agreed to receive marketing email, and that the date and reference are accurate. Do not continue if you cannot verify it.")) {
+      setMessage("Cancelled. No opt-in evidence was recorded.");
       return;
     }
     setActionBusy("consent:" + id, button, true);
-    setMessage("Recording consent evidence for " + id + "…");
+    setMessage("Validating and recording opt-in evidence for " + id + "…");
     try {
       const result = await api("/control/pilot/consent", {
         method: "POST",
-        body: JSON.stringify({ id, source: source.trim(), at: new Date().toISOString() })
+        body: JSON.stringify({ id, source: source.trim(), evidenceType: evidenceType.trim(), consentedAt: new Date(consentDate.trim() + "T12:00:00Z").toISOString(), confirmed: true, at: new Date().toISOString() })
       });
-      setMessage("Consent evidence saved for " + result.email + " and persisted to PostgreSQL. This does not send email.");
+      setMessage("Opt-in evidence reference recorded for " + result.email + ". The server validated the evidence fields; verify the reference is genuine. Recording it does not send email or override other safety gates.");
       await loadAll();
     } catch (error) {
       setMessage("Consent could not be recorded: " + error.message);
@@ -739,7 +758,7 @@ export function renderControlCentre() {
   async function decideApproval(encodedDraftId, approved, button) {
     const draftId = decodeURIComponent(encodedDraftId);
     if (button && button.disabled) return;
-    if (approved && !confirm("Approve this draft and attempt delivery? It will only send if the kill switch, provider, consent and compliance gates pass.")) return;
+    if (approved && !confirm("Approve this draft and attempt delivery? Approval is not consent. Sending remains blocked unless genuine recipient opt-in evidence is recorded and all provider, suppression and compliance checks pass.")) return;
     setActionBusy(draftId, button, true);
     setMessage((approved ? "Approving and attempting send: " : "Rejecting: ") + draftId + "…");
     try {
