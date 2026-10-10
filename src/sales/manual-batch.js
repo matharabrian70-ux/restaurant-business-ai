@@ -135,6 +135,10 @@ export function createManualSalesRuntime({
     if (env.SALES_PROVIDER_ENABLED !== "true") reasons.push("Email provider sending is disabled (SALES_PROVIDER_ENABLED is not true).");
     if (env.SALES_TEST_MODE === "true") reasons.push("Test mode is enabled; real prospect sending is blocked.");
     if (env.RESEND_DOMAIN_VERIFIED !== "true") reasons.push("Sender domain verification is not confirmed.");
+    if (!env.DATABASE_URL) reasons.push("Persistent consent and suppression database is not configured.");
+    if (!env.RESEND_API_KEY) reasons.push("Resend API key is not configured.");
+    if (!env.RESEND_FROM) reasons.push("Verified sender address is not configured.");
+    if (!env.RESEND_REPLY_TO) reasons.push("Reply-to address is not configured.");
     return reasons;
   }
 
