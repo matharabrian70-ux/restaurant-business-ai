@@ -127,6 +127,17 @@ export class AutonomousWorker {
         continue;
       }
 
+      // Persisted provider/recipient suppressions must win over consent and approval.
+      if (typeof this.store.isSuppressed === "function" && await this.store.isSuppressed(record.email)) {
+        await this.store.recordEvent(
+          "blocked:suppressed:" + identity,
+          "outreach.blocked",
+          { leadId: record.id, recipient: record.email, reasons: ["Recipient is on the persistent suppression list."] }
+        );
+        skipped++;
+        continue;
+      }
+
       // Public-directory discovery never supplies marketing consent. A durable
       // consent ledger is the only additional source that can upgrade a record
       // to allowed, and its evidence is carried through to the send gate.
@@ -271,53 +282,77 @@ export class AutonomousWorker {
   }
 
   async handleInbound(event) {
-    if (event?.type !== "email.received") return { ignored: true };
+    const type = event?.type;
+    if (!type || !type.startsWith("email.")) return { ignored: true };
 
-    const eventId = event.data?.email_id ?? event.id;
-    if (!eventId) throw new Error("Inbound event id is required");
-
-    const fresh = await this.store.recordEvent(eventId, "email.received", event);
+    const data = event.data || {};
+    const eventId = event.id || data.email_id || (type + ":" + String(data.from || data.to || "unknown"));
+    const fresh = await this.store.recordEvent(eventId, type, event);
     if (!fresh) return { duplicate: true };
 
-    const sender = parseSender(event.data?.from);
+    const recipientsRaw = data.to ?? data.email?.to ?? data.recipient ?? [];
+    const recipients = (Array.isArray(recipientsRaw) ? recipientsRaw : [recipientsRaw])
+      .flatMap((item) => typeof item === "string" ? [item] : Array.isArray(item) ? item : [])
+      .map((item) => {
+        const match = String(item).match(/<([^>]+)>/);
+        return String(match?.[1] || item).trim().toLowerCase();
+      })
+      .filter((address) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address));
+
+    if (type === "email.bounced" || type === "email.complained") {
+      const reason = type === "email.complained" ? "complaint" : "bounced";
+      let suppressed = 0;
+      for (const email of recipients) {
+        if (typeof this.store.suppressEmail === "function") {
+          await this.store.suppressEmail({ email, reason, source: "resend_webhook", at: new Date().toISOString() });
+          suppressed++;
+        }
+      }
+      return { processed: true, type, suppressed, recipients: recipients.length };
+    }
+
+    if (type !== "email.received") {
+      return { processed: true, type, suppressed: 0 };
+    }
+
+    const sender = parseSender(data.from);
     const lead = await this.store.findLeadByEmail(sender);
     if (!lead) return { matched: false, handoff: false };
 
-    const received = await this.fetchInboundContent(event.data?.email_id);
+    const received = await this.fetchInboundContent(data.email_id);
     const reply = {
-      subject: event.data?.subject ?? received.subject ?? "",
-      body: received.text ?? event.data?.text ?? received.html ?? event.data?.html ?? ""
+      subject: data.subject ?? received.subject ?? "",
+      body: received.text ?? data.text ?? received.html ?? data.html ?? ""
     };
-
     const classification = classifyReply(reply);
 
     if (classification.classification === "negative") {
+      const body = String(reply.body || "").toLowerCase();
+      const explicitOptOut = /\b(stop|unsubscribe|remove me|do not contact|don't contact|opt out|opt-out)\b/.test(body);
       await this.store.upsertLead({
         ...lead,
         stage: "closed_lost",
-        payload: { ...lead.payload, suppression: "unsubscribed" },
+        payload: { ...lead.payload, replyClassification: "negative", suppression: explicitOptOut ? "unsubscribed" : null },
         lastOutreachAt: lead.last_outreach_at,
         handoffAt: lead.handoff_at
       });
       await this.store.revokeConsent({
         email: sender,
-        source: "recipient negative reply",
+        source: explicitOptOut ? "recipient explicit opt-out reply" : "recipient negative reply",
         at: new Date().toISOString(),
         method: "reply_classification"
       });
-      return { matched: true, classification: classification.classification, handoff: false };
+      if (explicitOptOut && typeof this.store.suppressEmail === "function") {
+        await this.store.suppressEmail({ email: sender, reason: "unsubscribed", source: "recipient_reply", at: new Date().toISOString() });
+      }
+      return { matched: true, classification: classification.classification, handoff: false, suppressed: explicitOptOut };
     }
 
     if (!classification.handoff) {
       return { matched: true, classification: classification.classification, handoff: false };
     }
 
-    const handoff = createHandoff({
-      lead,
-      reply,
-      classification
-    });
-
+    const handoff = createHandoff({ lead, reply, classification });
     await this.store.upsertLead({
       ...lead,
       stage: "human_handoff",
@@ -325,14 +360,9 @@ export class AutonomousWorker {
       lastOutreachAt: lead.last_outreach_at,
       handoffAt: handoff.handoffAt
     });
-
-    if (this.notify) {
-      await this.notify(handoff);
-    }
-
+    if (this.notify) await this.notify(handoff);
     return { matched: true, classification: "positive", handoff: true, handoff };
-  }
-}
+  }}
 
 function envBoolean(value, fallback = false) {
   if (value === undefined) return fallback;
