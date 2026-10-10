@@ -265,9 +265,7 @@ export function renderControlCentre() {
         Prepare approved 25
       </button>
 
-      <button class="primary" onclick="approveAllPending()">
-        Approve all pending
-      </button>
+      <span class="small">Review and approve drafts individually; each approval reports its send result.</span>
 
       <div id="message" role="status" aria-live="polite" aria-atomic="true"></div>
     </section>
@@ -604,26 +602,6 @@ export function renderControlCentre() {
     }
   }
 
-  async function approveAllPending() {
-    if (!confirm("Approve all currently pending outreach drafts? This records one explicit human batch approval.")) {
-      return;
-    }
-
-    try {
-      const result = await api("/control/approvals/approve-all", {
-        method: "POST",
-        body: JSON.stringify({
-          limit: 25,
-          reason: "Human operator explicitly approved the current 25-prospect batch"
-        })
-      });
-
-      setMessage("Approved " + result.approved + " outreach drafts.");
-      await loadAll();
-    } catch (error) {
-      setMessage(error.message);
-    }
-  }
 
   async function loadMetrics() {
     try {
