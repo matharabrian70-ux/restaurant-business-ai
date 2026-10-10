@@ -17,6 +17,11 @@ const CUSTOMER_MENU_URL =
 const CUSTOMER_CHECKOUT_URL =
   "https://matharabrian70-ux.github.io/restaurant-ordering-platform/cart.html";
 
+const PORTFOLIO_URL =
+  "https://matharabrian70-ux.github.io/mathara-digital-portfolio/";
+const HOTEL_DEMO_URL =
+  "https://matharabrian70-ux.github.io/hotel-website-demo/#stay";
+
 function clean(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
@@ -103,6 +108,8 @@ function buildMessageParts({ restaurantName, research = {} }) {
     prototypeUrl: PROTOTYPE_URL,
     customerMenuUrl: CUSTOMER_MENU_URL,
     customerCheckoutUrl: CUSTOMER_CHECKOUT_URL,
+    portfolioUrl: PORTFOLIO_URL,
+    hotelDemoUrl: HOTEL_DEMO_URL,
     prototypeAttachment: PROTOTYPE_ATTACHMENT
   };
 }
@@ -112,7 +119,9 @@ function buildEmail({ restaurantName, research = {} }) {
     paragraphs,
     prototypeUrl,
     customerMenuUrl,
-    customerCheckoutUrl
+    customerCheckoutUrl,
+    portfolioUrl,
+    hotelDemoUrl
   } = buildMessageParts({ restaurantName, research });
   return [
     paragraphs[0],
@@ -128,6 +137,12 @@ function buildEmail({ restaurantName, research = {} }) {
     "",
     "This is the Checkout System:",
     customerCheckoutUrl,
+    "",
+    "My portfolio:",
+    portfolioUrl,
+    "",
+    "Hotel website demonstration (for hospitality businesses):",
+    hotelDemoUrl,
     "",
     ...paragraphs.slice(5).flatMap((paragraph) => [paragraph, ""])
   ].join("\n").trim();
@@ -185,6 +200,18 @@ function buildHtmlEmail({ restaurantName, research = {} }) {
               <a href="${escapeHtml(customerMenuUrl)}"
                  style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
                 This is the Customer Menu →
+              </a>
+            </div>
+            <div style="margin:0 0 10px;">
+              <a href="${escapeHtml(portfolioUrl)}"
+                 style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
+                View Portfolio →
+              </a>
+            </div>
+            <div style="margin:0 0 10px;">
+              <a href="${escapeHtml(hotelDemoUrl)}"
+                 style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
+                View Hotel Website Demo →
               </a>
             </div>
             <div style="margin:0;">
