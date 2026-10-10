@@ -527,18 +527,43 @@ export function renderControlCentre() {
   function renderSendingStatus(sending) {
     const box = document.getElementById("sendStatus");
     const gates = [
-      "Kill switch: " + (sending.killSwitchOn ? "ON" : "OFF"),
+      "Emergency switch: " + (sending.uiKillSwitchOn ? "ON" : "OFF"),
+      "Master switch: " + (sending.masterKillSwitchOn ? "ON" : "OFF"),
       "Provider: " + (sending.providerEnabled ? "enabled" : "disabled"),
       "B2B outreach: " + (sending.b2bOutreachEnabled ? "enabled" : "disabled"),
       "Test mode: " + (sending.testMode ? "ON" : "OFF"),
       "Sender domain verified: " + (sending.senderDomainVerified ? "yes" : "no")
     ];
+    const switchButton = sending.uiKillSwitchOn
+      ? '<button class="danger" onclick="toggleKillSwitch(false,this)"' + (sending.canResume ? "" : " disabled") + '>Resume sending</button>'
+      : '<button class="danger" onclick="toggleKillSwitch(true,this)">PAUSE ALL SENDS</button>';
     box.className = "status-banner" + (sending.enabled ? " safe" : "");
     box.innerHTML = "<strong>Live sending " + (sending.enabled ? "READY" : "BLOCKED") + "</strong><div>" +
       gates.map(escapeHtml).join(" · ") + "</div>" +
       (sending.reasons && sending.reasons.length
         ? "<ul>" + sending.reasons.map(reason => "<li>" + escapeHtml(reason) + "</li>").join("") + "</ul>"
-        : "<p>Global gates are open. Per-recipient consent and suppression checks still apply.</p>");
+        : "<p>Global gates are open. Per-recipient consent and suppression checks still apply.</p>") +
+      '<div style="margin-top:10px">' + switchButton + '</div>';
+  }
+
+  async function toggleKillSwitch(paused, button) {
+    if (button && button.disabled) return;
+    if (paused && !confirm("Immediately pause all manual sends in this running instance? The pause defaults ON again after a service restart.")) return;
+    if (!paused && !confirm("Resume sends? This only works if the Render master switch and all provider/compliance gates are already ready. Real prospect emails may be sent after individual approval and consent checks.")) return;
+    setActionBusy("kill-switch", button, true);
+    setMessage(paused ? "Pausing all sends…" : "Attempting to resume sends…");
+    try {
+      const result = await api("/control/send-kill-switch", {
+        method: "POST",
+        body: JSON.stringify({ paused })
+      });
+      renderSendingStatus(result.sending || {});
+      setMessage((paused ? "Emergency kill switch is ON. " : "Emergency kill switch is OFF. ") + (result.auditWarning || (result.sending.reasons || []).join(" ")));
+      await loadAll();
+    } catch (error) {
+      setMessage("Kill-switch action failed: " + error.message);
+      await loadAll();
+    } finally { setActionBusy("kill-switch", button, false); }
   }
 
   async function loadActivity() {
