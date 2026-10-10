@@ -7,7 +7,8 @@ test("Control Centre browser script parses and exposes actionable delivery diagn
   const html = renderControlCentre();
   const match = html.match(/<script>([\s\S]*?)<\/script>/i);
   assert.ok(match, "inline Control Centre script exists");
-  assert.doesNotThrow(() => new vm.Script(match[1]), "browser script should be syntactically valid");
+  try { new vm.Script(match[1], { filename: "control-centre-inline.js" }); }
+  catch (error) { throw new Error(error.stack); }
   for (const marker of [
     'id="sendStatus"',
     'id="activityLog"',
