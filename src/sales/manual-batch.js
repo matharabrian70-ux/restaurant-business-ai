@@ -193,6 +193,17 @@ export function createManualSalesRuntime({
     }
   }
 
+  function recordSendOutcome(draftId, outcome) {
+    findDraftState(draftId);
+    const normalized = {
+      status: outcome?.status || "blocked",
+      reason: String(outcome?.reason || "No reason supplied").slice(0, 1000),
+      updatedAt: outcome?.updatedAt || new Date().toISOString()
+    };
+    sendOutcomes.set(draftId, normalized);
+    return { draftId, ...normalized };
+  }
+
   function getSendingStatus() {
     const reasons = sendGateReasons();
     return {
@@ -289,6 +300,7 @@ export function createManualSalesRuntime({
     recordRecipientConsent,
     decideDraft,
     sendApprovedDraft,
+    recordSendOutcome,
     getSendingStatus,
     sendApprovedBatch
   };
