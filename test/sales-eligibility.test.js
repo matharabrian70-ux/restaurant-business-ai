@@ -25,6 +25,11 @@ test("rejects public listings and published email addresses as consent", () => {
   assert.match(result.errors.join(" "), /not evidence of opt-in/);
 });
 
+test("rejects a public email address as consent evidence", () => {
+  const result = validateConsentEvidence({ ...valid, source: "public email address published on restaurant.example" });
+  assert.equal(result.eligible, false);
+});
+
 test("rejects missing or unsupported evidence type and invalid dates", () => {
   const result = validateConsentEvidence({ ...valid, evidenceType: "public_email", consentedAt: "not-a-date" });
   assert.equal(result.eligible, false);
