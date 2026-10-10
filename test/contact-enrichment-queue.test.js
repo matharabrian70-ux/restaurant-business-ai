@@ -53,3 +53,26 @@ test("persisted lead enrichment saves public email and throttles repeated lookup
   const second = await enrichPersistedContactQueue(store, { fetchImpl, now });
   assert.deepEqual(second, { queued: 0, enriched: 0, noEmailFound: 0, failed: 0 });
 });
+
+
+test("enrichment never attempts a website for a lead already contacted or handed off", async () => {
+  const store = fakeStore([
+    {
+      identity: "website:contacted.example.test", lead_id: "contacted-1",
+      name: "Contacted Restaurant", email: null, website: "https://contacted.example.test/",
+      stage: "contacted", last_outreach_at: "2026-10-09T00:00:00.000Z", handoff_at: null, payload: {}
+    },
+    {
+      identity: "website:handoff.example.test", lead_id: "handoff-1",
+      name: "Handoff Restaurant", email: null, website: "https://handoff.example.test/",
+      stage: "human_handoff", last_outreach_at: null, handoff_at: "2026-10-09T00:00:00.000Z", payload: {}
+    }
+  ]);
+  let requests = 0;
+  const result = await enrichPersistedContactQueue(store, {
+    now: () => new Date("2026-10-10T01:00:00.000Z"),
+    fetchImpl: async () => { requests++; throw new Error("Must not request"); }
+  });
+  assert.deepEqual(result, { queued: 0, enriched: 0, noEmailFound: 0, failed: 0 });
+  assert.equal(requests, 0);
+});
