@@ -461,6 +461,42 @@ export function buildServer(
     }
 
 
+    if (req.method === "POST" && pathname === "/control/send-kill-switch") {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      try {
+        const body = JSON.parse(await readBody(req) || "{}");
+        const sending = manualSalesRuntime.setUiKillSwitchOn(body.paused);
+        let auditWarning = null;
+        if (env.DATABASE_URL) {
+          const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+          try {
+            await store.init();
+            await store.recordEvent(
+              "send-kill-switch:" + new Date().toISOString(),
+              body.paused ? "outreach.kill_switch_paused" : "outreach.kill_switch_resumed",
+              { paused: body.paused, actor: "human_control_centre", reasons: sending.reasons }
+            );
+          } catch (error) {
+            auditWarning = "Switch changed in this running instance, but audit persistence failed: " + error.message;
+          } finally {
+            await store.close().catch(() => {});
+          }
+        }
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ sending, auditWarning }));
+      } catch (error) {
+        res.writeHead(403, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: error.message || "kill_switch_action_failed" }));
+      }
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/control/send-status") {
       const authorization = req.headers.authorization || "";
       const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
