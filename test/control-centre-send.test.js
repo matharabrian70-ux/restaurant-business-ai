@@ -65,6 +65,7 @@ test("approved mock send only runs after global gates and documented consent are
     source: "synthetic fixture evidence",
     at: "2026-10-10T00:00:00.000Z"
   });
+  runtime.setUiKillSwitchOn(false);
   runtime.decideDraft(draft.id, true, "synthetic test approval");
   const outcome = await runtime.sendApprovedDraft({ draftId: draft.id });
   assert.equal(outcome.status, "sent");
