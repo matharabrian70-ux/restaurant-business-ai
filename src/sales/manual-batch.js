@@ -24,6 +24,7 @@ export function createManualSalesRuntime({
   const preparedLeadIds = new Set();
   const consentOverrides = new Map();
   const sendOutcomes = new Map();
+  // In-memory emergency stop defaults ON after every process restart.
 
   function preparePilotBatch({ limit = 25 } = {}) {
     if (!Number.isInteger(limit) || limit < 1 || limit > PILOT_PROSPECTS.length) {
@@ -128,8 +129,11 @@ export function createManualSalesRuntime({
     return { ...result, lead: state.lead, sendOutcome: sendOutcomes.get(draftId) };
   }
 
-  function sendGateReasons() {
+  let uiKillSwitchOn = true;
+
+  function sendGateReasons({ ignoreUiKillSwitch = false } = {}) {
     const reasons = [];
+    if (uiKillSwitchOn && !ignoreUiKillSwitch) reasons.push("Control Centre emergency kill switch is ON.");
     if (env.SALES_SEND_KILL_SWITCH !== "false") reasons.push("Sending kill switch is ON (SALES_SEND_KILL_SWITCH must be explicitly set to false).");
     if (env.SALES_B2B_OUTREACH_ENABLED !== "true") reasons.push("B2B outreach is disabled (SALES_B2B_OUTREACH_ENABLED is not true).");
     if (env.SALES_PROVIDER_ENABLED !== "true") reasons.push("Email provider sending is disabled (SALES_PROVIDER_ENABLED is not true).");
@@ -208,11 +212,25 @@ export function createManualSalesRuntime({
     return { draftId, ...normalized };
   }
 
+  function setUiKillSwitchOn(paused) {
+    if (typeof paused !== "boolean") throw new Error("paused must be a boolean");
+    if (!paused) {
+      const blockers = sendGateReasons({ ignoreUiKillSwitch: true });
+      if (blockers.length) throw new Error("Cannot resume sending: " + blockers.join(" "));
+    }
+    uiKillSwitchOn = paused;
+    return getSendingStatus();
+  }
+
   function getSendingStatus() {
     const reasons = sendGateReasons();
+    const masterKillSwitchOn = env.SALES_SEND_KILL_SWITCH !== "false";
     return {
       enabled: reasons.length === 0,
-      killSwitchOn: env.SALES_SEND_KILL_SWITCH !== "false",
+      killSwitchOn: uiKillSwitchOn || masterKillSwitchOn,
+      uiKillSwitchOn,
+      masterKillSwitchOn,
+      canResume: sendGateReasons({ ignoreUiKillSwitch: true }).length === 0,
       providerEnabled: env.SALES_PROVIDER_ENABLED === "true",
       b2bOutreachEnabled: env.SALES_B2B_OUTREACH_ENABLED === "true",
       testMode: env.SALES_TEST_MODE === "true",
@@ -306,6 +324,7 @@ export function createManualSalesRuntime({
     sendApprovedDraft,
     recordSendOutcome,
     getSendingStatus,
+    setUiKillSwitchOn,
     sendApprovedBatch
   };
 }
