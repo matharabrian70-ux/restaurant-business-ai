@@ -530,6 +530,53 @@ export function buildServer(
       return;
     }
 
+
+    const retrySendMatch = req.method === "POST"
+      ? pathname.match(/^\/control\/approvals\/([^/]+)\/send$/)
+      : null;
+    if (retrySendMatch) {
+      const authorization = req.headers.authorization || "";
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
+        res.writeHead(401, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: "unauthorized" }));
+        return;
+      }
+      try {
+        const draftId = decodeURIComponent(retrySendMatch[1]);
+        const sendOutcome = await manualSalesRuntime.sendApprovedDraft({ draftId });
+        let persistenceWarning = null;
+        if (env.DATABASE_URL) {
+          const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+          try {
+            await store.init();
+            const eventType = sendOutcome.status === "sent" ? "outreach.sent" :
+              sendOutcome.status === "failed" ? "outreach.failed" : "outreach.blocked";
+            await store.recordEvent(
+              "control-ui:" + draftId + ":" + eventType + ":" + new Date().toISOString(),
+              eventType,
+              {
+                draftId,
+                recipient: null,
+                reason: sendOutcome.reason || "",
+                sendStatus: sendOutcome.status
+              }
+            );
+          } catch (error) {
+            persistenceWarning = "Send result returned but activity could not be persisted: " + error.message;
+          } finally {
+            await store.close().catch(() => {});
+          }
+        }
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ sendOutcome, persistenceWarning }));
+      } catch (error) {
+        res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ error: error.message || "send_retry_failed" }));
+      }
+      return;
+    }
+
     if (pathname.startsWith("/control/")) {
       const handled = await handleControlRequest(
         req,
