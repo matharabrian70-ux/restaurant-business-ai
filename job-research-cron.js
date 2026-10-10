@@ -38,9 +38,10 @@ async function main() {
     const day = utcDay();
     const state = await store.get("africa_discovery_daily_state", { day, count: 0, cursor: 0 });
     const daily = state?.day === day ? state : { day, count: 0, cursor: state?.cursor || 0 };
+    const pipeline = await processPersistedDiscoveryQueue(store, { limit: 50 });
     const remaining = DAILY_TARGET - Number(daily.count || 0);
     if (remaining <= 0) {
-      console.log(JSON.stringify({ status: "daily_target_reached", day, discoveredToday: daily.count, target: DAILY_TARGET, contacted: 0, emailsSent: 0 }));
+      console.log(JSON.stringify({ status: "daily_target_reached", day, discoveredToday: daily.count, target: DAILY_TARGET, pipeline, contacted: 0, emailsSent: 0 }));
       return;
     }
 
@@ -99,7 +100,6 @@ async function main() {
       lastRunAt: new Date().toISOString()
     };
     await store.set("africa_discovery_daily_state", nextState);
-    const pipeline = await processPersistedDiscoveryQueue(store, { limit: 50 });
     console.log(JSON.stringify({
       status: "ok", mode: "discovery_only", day, market: near,
       queries: QUERIES, found: records.length, stored, updated, skipped,
