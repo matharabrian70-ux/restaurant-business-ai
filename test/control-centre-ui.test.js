@@ -18,6 +18,8 @@ test("Control Centre browser script parses and exposes actionable delivery diagn
     'Retry send',
     'Record documented consent',
     '/control/send-status',
-    '/control/activity'
+    '/control/activity',
+    'PAUSE ALL SENDS',
+    '/control/send-kill-switch'
   ]) assert.ok(html.includes(marker), "missing UI feature: " + marker);
 });
