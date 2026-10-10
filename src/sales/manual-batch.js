@@ -2,6 +2,7 @@ import { EndToEndSalesPipeline } from "./end-to-end-pipeline.js";
 import { createDeliverabilityPolicy } from "./deliverability.js";
 import PILOT_PROSPECTS from "./pilot-prospects.js";
 import { createDirectMarketingPolicy } from "./direct-marketing-policy.js";
+import { validateConsentEvidence } from "./eligibility.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -161,7 +162,7 @@ export function createManualSalesRuntime({
     }
     const record = state.pilotRecord;
     const consent = consentOverrides.get(record.id);
-    if (!consent || consent.state !== "allowed" || !consent.source) {
+    if (!consent || consent.state !== "allowed" || !consent.source || consent.confirmed !== true || !consent.evidenceType || !consent.consentedAt) {
       const outcome = { status: "blocked", reason: "Recipient consent evidence is missing. Record the lawful basis/evidence before sending.", updatedAt: new Date().toISOString() };
       sendOutcomes.set(draftId, outcome);
       return { draftId, ...outcome };
@@ -239,12 +240,17 @@ export function createManualSalesRuntime({
     };
   }
 
-  function recordRecipientConsent({ id, source, at = new Date().toISOString() } = {}) {
-    if (!id || !source) throw new Error("Prospect id and consent source are required");
+  function recordRecipientConsent({ id, source, evidenceType, consentedAt, confirmed, at = new Date().toISOString() } = {}) {
+    if (!id) throw new Error("Prospect id is required");
     if (!preparedLeadIds.has(id)) throw new Error("Prospect must be prepared before consent can be recorded");
+    const validation = validateConsentEvidence({ source, evidenceType, consentedAt, confirmed });
+    if (!validation.eligible) throw new Error(validation.errors.join("; "));
     consentOverrides.set(id, {
       state: "allowed",
-      source: String(source).slice(0, 500),
+      source: validation.evidence.source,
+      evidenceType: validation.evidence.evidenceType,
+      consentedAt: validation.evidence.consentedAt,
+      confirmed: true,
       at
     });
     return { id, ...consentOverrides.get(id) };
