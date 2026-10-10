@@ -12,7 +12,7 @@ const AFRICAN_MARKETS = [
   "Kampala, Uganda", "Monrovia, Liberia", "Freetown, Sierra Leone"
 ];
 const QUERIES = ["restaurant", "hotel", "lodge"];
-const DAILY_TARGET = Math.min(35, Math.max(1, Number(process.env.AUTONOMOUS_DISCOVERY_DAILY_TARGET || 35)));
+const DAILY_TARGET = Math.min(50, Math.max(1, Number(process.env.AUTONOMOUS_DISCOVERY_DAILY_TARGET || 50)));
 
 function identityFor(record) {
   if (record.website) return "website:" + record.website.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
