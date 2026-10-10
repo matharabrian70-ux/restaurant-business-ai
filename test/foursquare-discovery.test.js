@@ -102,3 +102,43 @@ test("Foursquare discovery reports provider HTTP errors", async () => {
     /Foursquare Places discovery failed: HTTP 401 — invalid service key/
   );
 });
+
+
+test("public email enrichment finds mailto and obfuscated addresses on linked contact pages", async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    calls.push(value);
+    const body = value === "https://cafe.example.test/"
+      ? '<html><footer><a href="/contact-us">Contact us</a></footer></html>'
+      : value === "https://cafe.example.test/contact-us"
+        ? '<html><p>Email: reservations [at] cafe [dot] example.test</p></html>'
+        : "";
+    return {
+      ok: true,
+      status: 200,
+      url: value,
+      async text() { return body; },
+      async json() { return {}; }
+    };
+  };
+
+  const { findPublicBusinessEmail } = await import("../src/autonomy/foursquare-discovery.js");
+  assert.equal(await findPublicBusinessEmail("https://cafe.example.test/", fetchImpl), "reservations@cafe.example.test");
+  assert.ok(calls.includes("https://cafe.example.test/contact-us"));
+  assert.ok(calls.every((url) => new URL(url).origin === "https://cafe.example.test"));
+});
+
+test("public email enrichment rejects local and private-network website targets", async () => {
+  const { findPublicBusinessEmail } = await import("../src/autonomy/foursquare-discovery.js");
+  let requests = 0;
+  const fetchImpl = async () => {
+    requests++;
+    throw new Error("Must not request a private address");
+  };
+
+  assert.equal(await findPublicBusinessEmail("http://127.0.0.1/admin", fetchImpl), null);
+  assert.equal(await findPublicBusinessEmail("http://192.168.1.10/", fetchImpl), null);
+  assert.equal(await findPublicBusinessEmail("http://localhost/", fetchImpl), null);
+  assert.equal(requests, 0);
+});
