@@ -61,6 +61,7 @@ export async function enrichPersistedContactQueue(store, {
         ...payload,
         contactEnrichmentAttemptedAt: current.toISOString(),
         contactEnrichmentSource: "public_website_contact_pages",
+        contactEnrichmentVersion: "public_website_contact_pages_v2",
         contactEnrichmentStatus: "failed",
         contactEnrichmentError: String(error?.message || error).slice(0, 240)
       };
