@@ -15,6 +15,7 @@ import { PostgresAutonomyStore } from "./src/autonomy/postgres-store.js";
 import { ComplianceStore } from "./src/sales/compliance-store.js";
 import { createManualSalesRuntime } from "./src/sales/manual-batch.js";
 import { extractSenderAddress } from "./src/sales/production-email-config.js";
+import { validateConsentEvidence } from "./src/sales/eligibility.js";
 
 const port = Number(process.env.PORT || 10000);
 
@@ -83,7 +84,7 @@ export function buildServer(
         });
       }
       const consent = await store.getConsentByEmail(recipientAddress);
-      if (!consent || consent.state !== "allowed" || !consent.source || !consent.consented_at) {
+      if (!consent || consent.state !== "allowed" || !consent.source || !consent.consented_at || !String(consent.method || "").startsWith("human_control_centre:")) {
         return manualSalesRuntime.recordSendOutcome(draftId, {
           status: "blocked",
           reason: "No current, persisted recipient consent evidence is recorded; no message was sent."
@@ -287,20 +288,21 @@ export function buildServer(
         const states = manualSalesRuntime.listPreparedDrafts();
         const state = states.find((item) => item.pilotRecord.id === body.id);
         if (!state?.lead?.contact?.email) throw new Error("Prepared prospect with an email is required");
-        const source = String(body.source || "").trim();
-        if (source.length < 12) throw new Error("Provide a specific, verifiable consent evidence source (at least 12 characters)");
+        const validation = validateConsentEvidence(body);
+        if (!validation.eligible) throw new Error(validation.errors.join("; "));
         if (!env.DATABASE_URL) throw new Error("DATABASE_URL is required to persist consent evidence");
         store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
         await store.init();
+        const persistedSource = JSON.stringify({ reference: validation.evidence.source, evidenceType: validation.evidence.evidenceType, confirmed: true });
         const consent = await store.recordConsent({
           email: state.lead.contact.email,
-          source,
-          at: body.at || new Date().toISOString(),
-          method: "human_control_centre_documented_consent"
+          source: persistedSource,
+          at: validation.evidence.consentedAt,
+          method: "human_control_centre:" + validation.evidence.evidenceType
         });
         const result = manualSalesRuntime.recordRecipientConsent({
           id: body.id,
-          source,
+          ...validation.evidence,
           at: body.at || new Date().toISOString()
         });
         res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
