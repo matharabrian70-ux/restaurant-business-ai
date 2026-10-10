@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { SalesControlPlane } from "../src/sales/control-plane.js";
 import { EndToEndSalesPipeline } from "../src/sales/end-to-end-pipeline.js";
 import { createSuppressionStore, recordUnsubscribe, isSuppressed } from "../src/sales/compliance.js";
+import { evaluateOutbound } from "../src/sales/deliverability.js";
 
 test("synthetic lead completes discovery-to-mock-send-to-positive-handoff without external email", async () => {
   const cp = new SalesControlPlane();
@@ -14,10 +15,11 @@ test("synthetic lead completes discovery-to-mock-send-to-positive-handoff withou
       return { status: "sent", provider: "mock", messageId: "mock-message-001" };
     }
   };
+  const suppressionStore = createSuppressionStore();
   const pipeline = new EndToEndSalesPipeline({
     controlPlane: cp,
     transport,
-    suppressionStore: createSuppressionStore()
+    suppressionStore
   });
 
   const added = pipeline.addProspect({
@@ -86,10 +88,19 @@ test("synthetic lead completes discovery-to-mock-send-to-positive-handoff withou
   assert.equal(replyResult.decision.classification, "positive");
   assert.ok(["human_handoff", "qualified"].includes(replyResult.lead.stage));
 
-  // Prove suppression is applied in the same in-memory test environment.
-  const suppression = createSuppressionStore();
-  recordUnsubscribe(suppression, "owner@fixture.example.test", { source: "synthetic test reply" });
-  assert.equal(isSuppressed(suppression, "owner@fixture.example.test"), true);
+  // Apply an unsubscribe to the pipeline's actual suppression store, then
+  // prove the outbound compliance gate blocks a later attempt for that address.
+  recordUnsubscribe(suppressionStore, "owner@fixture.example.test", { source: "synthetic test reply" });
+  assert.equal(isSuppressed(suppressionStore, "owner@fixture.example.test"), true);
+  assert.throws(() => evaluateOutbound({
+    recipient: { address: "owner@fixture.example.test" },
+    channel: "email",
+    suppressionStore,
+    consent: "allowed",
+    sender: { address: "test-sender@example.test", verified: true },
+    policy: { allowedChannels: ["email"], requireConsent: true, requireUnsubscribeMechanism: true, hasUnsubscribeMechanism: true }
+  }), /suppressed/i);
+  assert.equal(sent.length, 1, "unsubscribe check must not call the mock transport again");
   assert.equal(sent.every((message) => message.recipient.endsWith(".example.test")), true);
 });
 
