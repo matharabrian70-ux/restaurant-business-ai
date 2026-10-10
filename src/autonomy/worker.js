@@ -69,7 +69,34 @@ export class AutonomousWorker {
       return { status: pilot.status, sent: 0, discovered: 0 };
     }
 
-    const records = await this.discover({ env: this.env, fetchImpl: this.fetchImpl });
+    // In production, the scheduled discovery cron owns provider calls. The sales
+    // worker consumes the persisted queue so discovery and sales do not diverge.
+    // Test stores without listLeads retain the injectable discovery seam.
+    let records;
+    if (typeof this.store.listLeads === "function") {
+      const persisted = await this.store.listLeads({ limit: 500 });
+      records = persisted
+        .filter((item) =>
+          item.payload?.discoveryOnly === true &&
+          ["discovered", "researched"].includes(item.stage) &&
+          !item.last_outreach_at &&
+          !item.handoff_at
+        )
+        .map((item) => ({
+          ...(item.payload ?? {}),
+          id: item.lead_id,
+          name: item.name,
+          email: item.email ?? item.payload?.email ?? null,
+          website: item.website ?? item.payload?.website ?? null,
+          location: item.payload?.location ?? item.payload?.discoveryMarket ?? "Unknown location",
+          source: item.payload?.source ?? "public_business_directory",
+          sourceUrl: item.payload?.sourceUrl ?? "https://foursquare.com/",
+          businessType: item.payload?.businessType ?? "restaurant",
+          consentState: item.payload?.consentState ?? "unknown"
+        }));
+    } else {
+      records = await this.discover({ env: this.env, fetchImpl: this.fetchImpl });
+    }
 
     const controlPlane = new SalesControlPlane();
     const pipeline = new EndToEndSalesPipeline({
@@ -123,7 +150,7 @@ export class AutonomousWorker {
         location: record.location,
         website: record.website,
         email: record.email,
-        notes: ["Autonomous public-business discovery"],
+        notes: [],
         hasOnlineOrdering: false,
         deliveryAvailable: false,
         multipleBranches: false
