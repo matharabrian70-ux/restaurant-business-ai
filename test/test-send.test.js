@@ -63,7 +63,9 @@ test("controlled test sends only to configured recipient with fixed test content
   assert.equal(message.recipient, "owner@example.com");
   assert.equal(message.leadId, "CONTROLLED-TEST");
   assert.equal(message.idempotencyKey, buildControlledTestIdempotencyKey(env));
-  assert.match(message.body, /controlled communication test/i);
+  assert.match(message.body, /controlled email delivery test/i);
+  assert.deepEqual(message.attachments, []);
+  assert.equal(message.html.includes("href="), false);
 });
 
 test("controlled test cannot run while provider is disabled", async () => {
