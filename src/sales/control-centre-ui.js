@@ -683,29 +683,54 @@ export function renderControlCentre() {
       (state.drafts || []).map(draft => ({
         ...draft,
         restaurant: state.lead?.name || draft.leadId,
-        email: state.lead?.contact?.email || ""
+        email: state.lead?.contact?.email || "",
+        pilotId: state.pilotRecord?.id || "",
+        consentRecord: state.consentRecord || null
       }))
     );
-
-    if (!drafts.length) {
-      container.textContent = "No personalized drafts prepared yet.";
-      return;
-    }
-
-    container.innerHTML = drafts.map(draft =>
-      '<div class="approval">' +
+    if (!drafts.length) { container.textContent = "No personalized drafts prepared yet."; return; }
+    container.innerHTML = drafts.map(draft => {
+      const consentStatus = draft.consentRecord
+        ? "Evidence recorded: " + draft.consentRecord.source
+        : "No documented consent evidence recorded";
+      const sendOutcome = draft.sendOutcome || {};
+      return '<div class="approval">' +
         '<strong>' + escapeHtml(draft.restaurant) + '</strong>' +
         '<div class="meta">To: ' + escapeHtml(draft.email) + '</div>' +
         '<div class="meta">Subject: ' + escapeHtml(draft.subject) + '</div>' +
-        '<div class="meta">Strategy: ' + escapeHtml(draft.personalization?.strategy || "personalized") + '</div>' +
-        '<details style="margin-top:10px">' +
-          '<summary>Preview email</summary>' +
-          '<pre style="white-space:pre-wrap;font:inherit;line-height:1.5;margin-top:10px">' +
-            escapeHtml(draft.body) +
-          '</pre>' +
+        '<div class="meta">Draft status: ' + escapeHtml(draft.status) + '</div>' +
+        '<div class="meta">Consent: ' + escapeHtml(consentStatus) + '</div>' +
+        (sendOutcome.reason ? '<div class="meta" style="color:#b91c1c">Last send result: ' + escapeHtml(sendOutcome.status) + ' — ' + escapeHtml(sendOutcome.reason) + '</div>' : '') +
+        '<div class="actions" style="margin-top:10px">' +
+          (!draft.consentRecord && draft.pilotId ? '<button class="muted" onclick="recordConsent(\'' + encodeURIComponent(draft.pilotId) + '\',this)">Record documented consent…</button>' : '') +
+        '</div>' +
+        '<details style="margin-top:10px"><summary>Preview email</summary>' +
+          '<pre style="white-space:pre-wrap;font:inherit;line-height:1.5;margin-top:10px">' + escapeHtml(draft.body) + '</pre>' +
         '</details>' +
-      '</div>'
-    ).join("");
+      '</div>';
+    }).join("");
+  }
+
+  async function recordConsent(encodedPilotId, button) {
+    const id = decodeURIComponent(encodedPilotId);
+    if (button && button.disabled) return;
+    const source = prompt("Enter the specific, verifiable evidence that this recipient agreed to receive marketing email (for example, a recorded opt-in form or written request). A public website listing or published email address is not consent.");
+    if (!source || source.trim().length < 12) {
+      setMessage("Consent not recorded. A specific evidence source of at least 12 characters is required.");
+      return;
+    }
+    setActionBusy("consent:" + id, button, true);
+    setMessage("Recording consent evidence for " + id + "…");
+    try {
+      const result = await api("/control/pilot/consent", {
+        method: "POST",
+        body: JSON.stringify({ id, source: source.trim(), at: new Date().toISOString() })
+      });
+      setMessage("Consent evidence saved for " + result.email + " and persisted to PostgreSQL. This does not send email.");
+      await loadAll();
+    } catch (error) {
+      setMessage("Consent could not be recorded: " + error.message);
+    } finally { setActionBusy("consent:" + id, button, false); }
   }
 
   async function decideApproval(encodedDraftId, approved, button) {
