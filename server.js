@@ -492,36 +492,44 @@ export function buildServer(
         if (body.approved) {
           sendOutcome = await manualSalesRuntime.sendApprovedDraft({ draftId });
         }
-        const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
-        try {
-          await store.init();
-          const eventType = !body.approved
-            ? "outreach.rejected"
-            : sendOutcome?.status === "sent"
-              ? "outreach.sent"
-              : sendOutcome?.status === "failed"
-                ? "outreach.failed"
-                : sendOutcome?.status === "blocked"
-                  ? "outreach.blocked"
-                  : "outreach.approved";
-          await store.recordEvent(
-            "control-ui:" + draftId + ":" + eventType + ":" + new Date().toISOString(),
-            eventType,
-            {
-              draftId,
-              leadId: decision.approval?.leadId || decision.lead?.id || null,
-              recipient: decision.lead?.contact?.email || null,
-              reason: sendOutcome?.reason || body.reason || "",
-              sendStatus: sendOutcome?.status || (body.approved ? "approved" : "rejected")
-            }
-          );
-        } finally {
-          await store.close();
+        let persistenceWarning = null;
+        if (env.DATABASE_URL) {
+          const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+          try {
+            await store.init();
+            const eventType = !body.approved
+              ? "outreach.rejected"
+              : sendOutcome?.status === "sent"
+                ? "outreach.sent"
+                : sendOutcome?.status === "failed"
+                  ? "outreach.failed"
+                  : sendOutcome?.status === "blocked"
+                    ? "outreach.blocked"
+                    : "outreach.approved";
+            await store.recordEvent(
+              "control-ui:" + draftId + ":" + eventType + ":" + new Date().toISOString(),
+              eventType,
+              {
+                draftId,
+                leadId: decision.approval?.leadId || decision.lead?.id || null,
+                recipient: decision.lead?.contact?.email || null,
+                reason: sendOutcome?.reason || body.reason || "",
+                sendStatus: sendOutcome?.status || (body.approved ? "approved" : "rejected")
+              }
+            );
+          } catch (error) {
+            persistenceWarning = "Action completed but activity persistence failed: " + error.message;
+          } finally {
+            await store.close().catch(() => {});
+          }
+        } else {
+          persistenceWarning = "DATABASE_URL is not configured; action activity was not persisted.";
         }
         res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
         res.end(JSON.stringify({
           approval: decision.approval,
-          sendOutcome: sendOutcome || { status: body.approved ? "approved" : "rejected" }
+          sendOutcome: sendOutcome || { status: body.approved ? "approved" : "rejected" },
+          persistenceWarning
         }));
       } catch (error) {
         res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
