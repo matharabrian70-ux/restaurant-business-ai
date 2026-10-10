@@ -727,6 +727,7 @@ export function buildServer(
               })
             : null
         });
+        await worker.store.init();
         const result = await worker.handleInbound(event);
         await worker.store.close();
 
