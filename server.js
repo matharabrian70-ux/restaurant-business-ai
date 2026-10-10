@@ -469,7 +469,7 @@ export function buildServer(
     }
 
     const approvalActionMatch = req.method === "POST"
-      ? pathname.match(/^\\/control\\/approvals\\/([^/]+)\\/decide$/)
+      ? pathname.match(/^\/control\/approvals\/([^/]+)\/decide$/)
       : null;
     if (approvalActionMatch) {
       const authorization = req.headers.authorization || "";
