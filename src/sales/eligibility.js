@@ -6,7 +6,7 @@ const ALLOWED_EVIDENCE_TYPES = new Set([
 ]);
 
 const PUBLIC_SOURCE_PATTERNS = [
-  /public (website|business|directory|listing)/i,
+  /public (website|business|directory|listing|email|address)/i,
   /published (email|address)/i,
   /my own notes/i,
   /no consent/i,
