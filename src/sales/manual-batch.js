@@ -99,6 +99,7 @@ export function createManualSalesRuntime({
       .filter(Boolean)
       .map((state) => {
         const copy = clone(state);
+        copy.consentRecord = consentOverrides.get(state.pilotRecord.id) || null;
         copy.drafts = (copy.drafts || []).map((draft) => ({
           ...draft,
           sendOutcome: sendOutcomes.get(draft.id) || null
