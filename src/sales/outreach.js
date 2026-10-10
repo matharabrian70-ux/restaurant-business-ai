@@ -153,7 +153,9 @@ function buildHtmlEmail({ restaurantName, research = {} }) {
     paragraphs,
     prototypeUrl,
     customerMenuUrl,
-    customerCheckoutUrl
+    customerCheckoutUrl,
+    portfolioUrl,
+    hotelDemoUrl
   } = buildMessageParts({ restaurantName, research });
   const [greeting, ...rest] = paragraphs;
   const closingIndex = rest.findIndex((paragraph) => paragraph === "Regards,");
