@@ -1,6 +1,7 @@
 import { discoverFromFoursquare } from "./src/autonomy/foursquare-discovery.js";
 import { PostgresAutonomyStore } from "./src/autonomy/postgres-store.js";
 import { processPersistedDiscoveryQueue } from "./src/autonomy/discovery-queue.js";
+import { enrichPersistedContactQueue } from "./src/autonomy/contact-enrichment-queue.js";
 
 const AFRICAN_MARKETS = [
   "Nairobi, Kenya", "Mombasa, Kenya", "Kampala, Uganda", "Kigali, Rwanda",
@@ -38,10 +39,11 @@ async function main() {
     const day = utcDay();
     const state = await store.get("africa_discovery_daily_state", { day, count: 0, cursor: 0 });
     const daily = state?.day === day ? state : { day, count: 0, cursor: state?.cursor || 0 };
+    const contactEnrichment = await enrichPersistedContactQueue(store, { limit: 20 });
     const pipeline = await processPersistedDiscoveryQueue(store, { limit: 50 });
     const remaining = DAILY_TARGET - Number(daily.count || 0);
     if (remaining <= 0) {
-      console.log(JSON.stringify({ status: "daily_target_reached", day, discoveredToday: daily.count, target: DAILY_TARGET, pipeline, contacted: 0, emailsSent: 0 }));
+      console.log(JSON.stringify({ status: "daily_target_reached", day, discoveredToday: daily.count, target: DAILY_TARGET, contactEnrichment, pipeline, contacted: 0, emailsSent: 0 }));
       return;
     }
 
@@ -104,7 +106,7 @@ async function main() {
       status: "ok", mode: "discovery_only", day, market: near,
       queries: QUERIES, found: records.length, stored, updated, skipped,
       discoveredToday: nextState.count, dailyTarget: DAILY_TARGET,
-      pipeline, contacted: 0, emailsSent: 0
+      contactEnrichment, pipeline, contacted: 0, emailsSent: 0
     }));
   } finally {
     await store.close();
