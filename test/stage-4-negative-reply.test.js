@@ -16,7 +16,7 @@ test("negative reply after mock delivery is classified and never handed off", as
   const added = pipeline.addProspect({
     id: "STAGE4-NEGATIVE-001", name: "Synthetic Cafe", businessType: "restaurant",
     location: "Nairobi, Kenya", website: "https://synthetic.example.test",
-    email: "owner@synthetic.example.test", source: "test_fixture", consentState: "allowed",
+    email: "owner@synthetic.example.test", source: "manual", consentState: "allowed",
     consentEvidence: { source: "synthetic test fixture", at: "2026-10-10T00:00:00.000Z" }
   }, { name: "Synthetic Cafe", location: "Nairobi, Kenya", website: "https://synthetic.example.test", email: "owner@synthetic.example.test", notes: [] });
   const prepared = pipeline.prepareOutreach(added.lead.id, "email");
