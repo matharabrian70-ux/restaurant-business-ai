@@ -21,6 +21,10 @@ export async function enrichPersistedContactQueue(store, {
     if (!lead.website || lead.email || payload.email) return false;
     if (lead.last_outreach_at || lead.handoff_at) return false;
     const attempted = Date.parse(payload.contactEnrichmentAttemptedAt ?? "");
+    const currentVersion = "public_website_contact_pages_v2";
+    // Revisit leads once when the enrichment algorithm changes; otherwise keep
+    // the seven-day cooldown to avoid repeatedly crawling the same site.
+    if (payload.contactEnrichmentVersion !== currentVersion) return true;
     return !Number.isFinite(attempted) || current.getTime() - attempted >= 7 * 24 * 60 * 60 * 1000;
   }).slice(0, safeLimit);
 
@@ -35,6 +39,7 @@ export async function enrichPersistedContactQueue(store, {
         ...payload,
         contactEnrichmentAttemptedAt: current.toISOString(),
         contactEnrichmentSource: "public_website_contact_pages",
+        contactEnrichmentVersion: "public_website_contact_pages_v2",
         contactEnrichmentStatus: email ? "email_found" : "no_public_email_found"
       };
       await store.upsertLead({
