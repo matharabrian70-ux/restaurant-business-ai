@@ -89,3 +89,61 @@ export async function sendControlledTestEmail({ env = process.env, transport }) 
     result
   };
 }
+
+export async function sendControlledProposalEmail({ env = process.env, transport }) {
+  const validation = validateControlledTestConfig(env);
+  if (!validation.ok) throw new Error(validation.errors.join("; "));
+  if (!transport?.send) throw new Error("Transport is required");
+
+  const lead = {
+    id: "CONTROLLED-PILI-PROPOSAL",
+    name: "Pili Restaurant",
+    businessType: "restaurant",
+    country: "International test fixture"
+  };
+  const research = {
+    name: "Pili Restaurant",
+    businessType: "restaurant",
+    notes: [],
+    researchedAt: "controlled-test-fixture"
+  };
+  const draft = createOutreachDraft({ lead, research, channel: "email" });
+  const recipient = String(env.SALES_TEST_RECIPIENT || "").trim();
+  // Exercise the actual proposal HTML and links, but never attach the ZIP archive.
+  const attachments = [];
+  const idempotencyKey = "controlled-proposal/resend/" + createHash("sha256")
+    .update(JSON.stringify({
+      from: String(env.RESEND_FROM || ""),
+      to: recipient,
+      subject: draft.subject,
+      text: draft.body,
+      html: draft.html,
+      attachments,
+      leadId: lead.id,
+      outreachId: draft.id
+    }))
+    .digest("hex");
+
+  const result = await transport.send({
+    id: draft.id,
+    leadId: lead.id,
+    outreachId: draft.id,
+    channel: "email",
+    recipient,
+    subject: draft.subject,
+    body: draft.body,
+    html: draft.html,
+    attachments,
+    idempotencyKey
+  });
+
+  return {
+    status: "sent",
+    test: true,
+    template: "pili_restaurant_proposal",
+    recipient,
+    subject: draft.subject,
+    attachment: null,
+    result
+  };
+}
