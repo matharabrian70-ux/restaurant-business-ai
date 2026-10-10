@@ -35,7 +35,7 @@ function isHotelLead(lead = {}, research = {}) {
 }
 
 function isKenyanLead(lead = {}, research = {}) {
-  const location = [lead.country, lead.location, lead.address, research.country, research.location, research.address, research.currency]
+  const location = [lead.country, lead.countryCode, lead.location, lead.address, research.country, research.countryCode, research.location, research.address, research.currency]
     .filter(Boolean).join(" ").toLowerCase();
   return /kenya|\bke\b|kes|ksh|k\.sh/.test(location);
 }
@@ -203,9 +203,6 @@ function buildEmail({ restaurantName, research = {} }) {
     "My portfolio:",
     portfolioUrl,
     "",
-    "Hotel website demonstration (for hospitality businesses):",
-    hotelDemoUrl,
-    "",
     ...paragraphs.slice(5).flatMap((paragraph) => [paragraph, ""])
   ].join("\n").trim();
 }
@@ -270,12 +267,6 @@ function buildHtmlEmail({ restaurantName, research = {}, pricingHtml = "" }) {
               <a href="${escapeHtml(portfolioUrl)}"
                  style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
                 View Portfolio →
-              </a>
-            </div>
-            <div style="margin:0 0 10px;">
-              <a href="${escapeHtml(hotelDemoUrl)}"
-                 style="display:block;background:#168a4a;color:#ffffff;text-decoration:none;font-weight:700;text-align:center;padding:13px 18px;border-radius:999px;">
-                View Hotel Website Demo →
               </a>
             </div>
             <div style="margin:0;">
