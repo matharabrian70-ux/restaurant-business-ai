@@ -25,6 +25,12 @@ function utcDay() {
 }
 
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required for the Africa discovery cron");
+  }
+  if (!process.env.FOURSQUARE_API_KEY) {
+    throw new Error("FOURSQUARE_API_KEY is missing from the Render research cron environment; no discovery request was made");
+  }
   const store = new PostgresAutonomyStore({ connectionString: process.env.DATABASE_URL });
   try {
     await store.init();
