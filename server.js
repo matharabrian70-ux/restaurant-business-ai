@@ -63,6 +63,43 @@ export function buildServer(
     timingSafeEqual
   });
 
+  async function attemptApprovedManualSend(draftId, recipientAddress) {
+    const gates = manualSalesRuntime.getSendingStatus();
+    if (!gates.enabled) return manualSalesRuntime.sendApprovedDraft({ draftId });
+    if (!env.DATABASE_URL) {
+      return manualSalesRuntime.recordSendOutcome(draftId, {
+        status: "blocked",
+        reason: "Persistent consent and suppression checks are unavailable because DATABASE_URL is not configured."
+      });
+    }
+    const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+    try {
+      await store.init();
+      if (await store.isSuppressed(recipientAddress)) {
+        const suppression = await store.getSuppression(recipientAddress);
+        return manualSalesRuntime.recordSendOutcome(draftId, {
+          status: "blocked",
+          reason: "Recipient is suppressed (" + suppression.reason + "); no message was sent."
+        });
+      }
+      const consent = await store.getConsentByEmail(recipientAddress);
+      if (!consent || consent.state !== "allowed" || !consent.source || !consent.consented_at) {
+        return manualSalesRuntime.recordSendOutcome(draftId, {
+          status: "blocked",
+          reason: "No current, persisted recipient consent evidence is recorded; no message was sent."
+        });
+      }
+      return await manualSalesRuntime.sendApprovedDraft({ draftId });
+    } catch (error) {
+      return manualSalesRuntime.recordSendOutcome(draftId, {
+        status: "blocked",
+        reason: "Safety preflight failed closed; no message was sent. " + error.message
+      });
+    } finally {
+      await store.close().catch(() => {});
+    }
+  }
+
   return http.createServer(async (req, res) => {
     const requestUrl = new URL(req.url || "/", "http://localhost");
     const pathname = requestUrl.pathname;
@@ -503,7 +540,7 @@ export function buildServer(
         );
         let sendOutcome = decision.sendOutcome;
         if (body.approved) {
-          sendOutcome = await manualSalesRuntime.sendApprovedDraft({ draftId });
+          sendOutcome = await attemptApprovedManualSend(draftId, decision.lead?.contact?.email || "");
         }
         let persistenceWarning = null;
         if (env.DATABASE_URL) {
@@ -565,7 +602,9 @@ export function buildServer(
       }
       try {
         const draftId = decodeURIComponent(retrySendMatch[1]);
-        const sendOutcome = await manualSalesRuntime.sendApprovedDraft({ draftId });
+        const state = manualSalesRuntime.listPreparedDrafts().find((item) => (item.drafts || []).some((draft) => draft.id === draftId));
+        const recipientAddress = state?.lead?.contact?.email || "";
+        const sendOutcome = await attemptApprovedManualSend(draftId, recipientAddress);
         let persistenceWarning = null;
         if (env.DATABASE_URL) {
           const store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
