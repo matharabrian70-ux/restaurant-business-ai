@@ -238,28 +238,41 @@ export function buildServer(
 
     if (req.method === "POST" && pathname === "/control/pilot/consent") {
       const authorization = req.headers.authorization || "";
-      const suppliedToken = authorization.startsWith("Bearer ")
-        ? authorization.slice(7)
-        : "";
-
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
       if (!tokensMatch(env.CONTROL_PLANE_TOKEN, suppliedToken)) {
-        res.writeHead(401, {"content-type": "application/json"});
+        res.writeHead(401, { "content-type": "application/json", "cache-control": "no-store" });
         res.end(JSON.stringify({ error: "unauthorized" }));
         return;
       }
-
+      let store = null;
       try {
         const body = JSON.parse(await readBody(req) || "{}");
+        const states = manualSalesRuntime.listPreparedDrafts();
+        const state = states.find((item) => item.pilotRecord.id === body.id);
+        if (!state?.lead?.contact?.email) throw new Error("Prepared prospect with an email is required");
+        const source = String(body.source || "").trim();
+        if (source.length < 12) throw new Error("Provide a specific, verifiable consent evidence source (at least 12 characters)");
+        if (!env.DATABASE_URL) throw new Error("DATABASE_URL is required to persist consent evidence");
+        store = new PostgresAutonomyStore({ connectionString: env.DATABASE_URL });
+        await store.init();
+        const consent = await store.recordConsent({
+          email: state.lead.contact.email,
+          source,
+          at: body.at || new Date().toISOString(),
+          method: "human_control_centre_documented_consent"
+        });
         const result = manualSalesRuntime.recordRecipientConsent({
           id: body.id,
-          source: body.source,
-          at: body.at
+          source,
+          at: body.at || new Date().toISOString()
         });
-        res.writeHead(200, {"content-type": "application/json"});
-        res.end(JSON.stringify(result));
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ ...result, email: state.lead.contact.email, persisted: true, evidenceRef: consent.evidence_ref }));
       } catch (error) {
-        res.writeHead(400, {"content-type": "application/json"});
+        res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
         res.end(JSON.stringify({ error: error.message }));
+      } finally {
+        if (store) await store.close().catch(() => {});
       }
       return;
     }
