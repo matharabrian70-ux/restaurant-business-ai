@@ -5,7 +5,8 @@
   "description": "AI Business OS around the Restaurant DOS",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "start": "node server.js"
   },
   "dependencies": {
     "pg": "^8.16.3",
