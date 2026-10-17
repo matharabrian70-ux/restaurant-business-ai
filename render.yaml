@@ -107,3 +107,32 @@ services:
         value: "true"
       - key: AUTONOMY_HANDOFF_RECIPIENT
         sync: false
+
+  - type: cron
+    name: personal-morning-voice-agent
+    runtime: node
+    plan: 0.5c-512mb
+    buildCommand: npm install
+    startCommand: node personal-agent/morning-brief.js
+    schedule: "0 4 * * *"
+    envVars:
+      - key: MORNING_AGENT_ENABLED
+        value: "false"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: "gpt-5-mini"
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: MORNING_AGENT_TO_NUMBER
+        sync: false
+      - key: DAILY_GOALS
+        value: "Protect the most important work; make measurable progress on sales."
+      - key: DAILY_TASKS
+        value: "Review priorities; execute the highest-impact sales and engineering tasks."
+      - key: SALES_TARGET
+        value: "Complete the planned sales calls and follow-ups; focus on qualified conversations."
